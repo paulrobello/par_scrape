@@ -1,0 +1,241 @@
+name: Publish Python 🐍 distribution 📦 to PyPI and TestPyPI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'release-*.*.*'
+
+jobs:
+  build:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
+    if: ${{ ! contains(github.event.head_commit.message, 'no-build') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+          uv sync
+      - name: Static Typecheck
+        run: |
+          make typecheck
+      - name: Lint
+        run: |
+          make lint
+      - name: Package
+        run: make packagecheck
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+  tag-version:
+    name: Tag Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Grant write access to the repository
+    needs:
+      - build
+    if: ${{ !startsWith(github.ref, 'refs/tags/release-v') }}  # tag if not a release
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.event.pusher.email }}"
+
+      - name: Get version from __init__.py
+        id: get_version
+        run: |
+          # Extract the version from the __init__.py file
+          VERSION=$(python -c "exec(open('./par_scrape/__init__.py').read()); print(__version__)")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: App VERSION
+        run: echo "VERSION is ${{ env.VERSION }}"
+
+      - name: Fetch all tags
+        run: git fetch --tags
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          TAG_EXISTS=$(git tag --list "v${{ env.VERSION }}")
+          if [ -z "$TAG_EXISTS" ]; then
+            echo "TAG_EXISTS=false" >> $GITHUB_ENV
+          else
+            echo "TAG_EXISTS=true" >> $GITHUB_ENV
+          fi
+
+      - name: Delete existing tag locally and remotely
+        if: env.TAG_EXISTS == 'true'
+        env:
+          VERSION: ${{ env.VERSION }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag -d "v$VERSION"
+          git push --delete origin "v$VERSION"
+
+      - name: Create new tag
+        env:
+          VERSION: ${{ env.VERSION }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag -a "v$VERSION" -m "Version $VERSION"
+          git push origin "v$VERSION"
+
+  check-release:
+    name: Check if release requested
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Grant write access to the repository
+    needs:
+      - build
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      do_release: ${{ steps.check_do_release.outputs.do_release }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.event.pusher.email }}"
+
+      - name: Get version from __init__.py
+        id: get_version
+        run: |
+          # Extract the version from the __init__.py file
+          VERSION=$(python -c "exec(open('./par_scrape/__init__.py').read()); print(__version__)")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Check Do Release
+        id: check_do_release
+        run: |
+          if  [[ "${{ github.ref }}" == "refs/tags/release-v"* ]] ; then
+            echo "do_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "do_release=false" >> $GITHUB_OUTPUT
+          fi
+
+  publish-to-testpypi:
+    name: Publish Python 🐍 distribution 📦 to TestPyPI
+    if: ${{ github.event_name == 'push' && needs.check-release.outputs.do_release != 'true' }}
+    needs:
+    - build
+    - tag-version
+    - check-release
+    runs-on: ubuntu-latest
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/par_scrape
+
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution 📦 to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        skip-existing: true
+
+  publish-to-pypi:
+    name: >-
+      Publish Python 🐍 distribution 📦 to PyPI
+    if: ${{ needs.check-release.outputs.do_release == 'true' }}  # only publish to PyPI when do_release is true
+    needs:
+      - build
+      - check-release
+    runs-on: ubuntu-latest
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/par_scrape
+
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+
+  github-release:
+    name: >-
+      Sign the Python 🐍 distribution 📦 with Sigstore
+      and upload them to GitHub Release
+    needs:
+      - publish-to-pypi
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # IMPORTANT: mandatory for making GitHub Releases
+      id-token: write  # IMPORTANT: mandatory for sigstore
+
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Sign the dists with Sigstore
+        uses: sigstore/gh-action-sigstore-python@v2.1.1
+        with:
+          inputs: >-
+            ./dist/*.tar.gz
+            ./dist/*.whl
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh release create \
+          '${{ github.ref_name }}' \
+          --repo '${{ github.repository }}' \
+          --generate-notes \
+          --latest
+      - name: Upload artifact signatures to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        # Upload to GitHub Release using the `gh` CLI.
+        # `dist/` contains the built packages, and the
+        # sigstore-produced signatures and certificates.
+        run: |
+          gh release upload \
+          '${{ github.ref_name }}' dist/** \
+          --repo '${{ github.repository }}'
