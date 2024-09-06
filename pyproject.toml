@@ -1,0 +1,102 @@
+[project]
+name = "par_scrape"
+dynamic = ["version"]
+description = "A versatile web scraping tool with options for Selenium or Playwright, featuring OpenAI-powered data extraction and formatting."
+url = "https://github.com/paulrobello/par_scrape"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Paul Robello", email = "probello@gmail.com" }]
+maintainers = [{ name = "Paul Robello", email = "probello@gmail.com" }]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Markup :: HTML",
+    "Typing :: Typed"
+]
+keywords = ["web scraping", "selenium", "playwright", "openai", "data extraction"]
+dependencies = [
+    "aiofiles>=24.1.0",
+    "beautifulsoup4>=4.12.3",
+    "html2text>=2024.2.26",
+    "openai>=1.43.0",
+    "openpyxl>=3.1.5",
+    "pandas>=2.2.2",
+    "playwright>=1.46.0",
+    "pydantic-config>=0.3.0",
+    "pydantic>=2.9.0",
+    "python-dotenv>=1.0.1",
+    "rich>=13.8.0",
+    "selenium>=4.24.0",
+    "tabulate>=0.9.0",
+    "tiktoken>=0.7.0",
+    "typer>=0.12.5",
+    "typing-extensions>=4.12.2",
+    "webdriver-manager>=4.0.2",
+]
+
+packages = [
+    "src/par_scrape"
+]
+
+[project.urls]
+Homepage = "https://github.com/paulrobello/par_scrape"
+Documentation = "https://github.com/paulrobello/par_scrape/blob/main/README.md"
+Repository = "https://github.com/paulrobello/par_scrape"
+Issues = "https://github.com/paulrobello/par_scrape/issues"
+Discussions = "https://github.com/paulrobello/par_scrape/discussions"
+Wiki = "https://github.com/paulrobello/par_scrape/wiki"
+
+[project.scripts]
+par_scrape = "par_scrape.__main__:app"
+
+[build-system]
+requires = ["hatchling", "wheel"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "build>=1.2.1",
+    "twine>=5.1.1",
+    "black>=24.8.0",
+    "pylint>=3.2.7",
+    "pyright>=1.1.379",
+    "pre-commit>=3.8.0",
+]
+
+[tool.hatch.version]
+path = "src/par_scrape/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/par_scrape"]
+include = [
+    "*.py",
+    "py.typed",
+    "*.png",
+    "*.md",
+    "*.tcss",
+    "*.png",
+    "*.md",
+    "*.tcss"
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/par_scrape",
+    "LICENSE",
+    "README.md",
+    "pyproject.toml"
+]
+exclude = [
+    "*.pyc",
+    "__pycache__",
+    "*.so",
+    "*.dylib"
+]
