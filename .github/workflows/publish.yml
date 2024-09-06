@@ -69,7 +69,7 @@ jobs:
       - name: Get version from __init__.py
         id: get_version
         run: |
-          echo "VERSION=$(uv python -c "from src.par_scrape import __version__; print(__version__)")" >> $GITHUB_ENV
+          echo "VERSION=$(uv run python -c "from src.par_scrape import __version__; print(__version__)")" >> $GITHUB_ENV
           echo "Version extracted: ${{ env.VERSION }}"
 
       - name: App VERSION
@@ -139,7 +139,7 @@ jobs:
       - name: Get version from __init__.py
         id: get_version
         run: |
-          echo "VERSION=$(uv python -c "from src.par_scrape import __version__; print(__version__)")" >> $GITHUB_ENV
+          echo "VERSION=$(uv run python -c "from src.par_scrape import __version__; print(__version__)")" >> $GITHUB_ENV
           echo "Version extracted: ${{ env.VERSION }}"
 
       - name: Check Do Release
