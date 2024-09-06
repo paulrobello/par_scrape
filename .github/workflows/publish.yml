@@ -62,9 +62,8 @@ jobs:
       - name: Get version from __init__.py
         id: get_version
         run: |
-          # Extract the version from the __init__.py file
-          VERSION=$(python -c "exec(open('./src/par_scrape/__init__.py').read()); print(__version__)")
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$(python -c "from src.par_scrape import __version__; print(__version__)")" >> $GITHUB_ENV
+          echo "Version extracted: ${{ env.VERSION }}"
 
       - name: App VERSION
         run: echo "VERSION is ${{ env.VERSION }}"
