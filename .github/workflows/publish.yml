@@ -30,11 +30,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install uv tomli
           uv sync
-      - name: Save cache
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
       - name: Static Typecheck
         run: |
           make typecheck
@@ -48,6 +43,11 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
+      - name: Save cache
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
 
   tag-version:
     name: Tag Version
@@ -65,6 +65,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Configure Git
         run: |
