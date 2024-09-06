@@ -16,15 +16,11 @@ export PIPENV_VERBOSITY=-1
 # Run the app.
 .PHONY: run
 run:	        # Run the app
-	$(python) -m $(lib) "$(ARG1)" "$(ARG2)" "$(ARG3)" "$(ARG4)" "$(ARG5)" "$(ARG6)" "$(ARG7)" "$(ARG8)" "$(ARG9)"
+	$(run) $(lib) "$(ARG1)" "$(ARG2)" "$(ARG3)" "$(ARG4)" "$(ARG5)" "$(ARG6)" "$(ARG7)" "$(ARG8)" "$(ARG9)"
 
 .PHONY: app_help
 app_help:		# Show app help
-	$(python) -m $(lib) --help
-
-.PHONY: test
-test:	        # Run textual dev console
-	$(python) -m unittest discover -s tests
+	$(run) $(lib)  --help
 
 
 ##############################################################################
@@ -38,7 +34,6 @@ uv-sync:
 
 .PHONY: setup
 setup: uv-lock uv-sync	        # use this for first time run
-	uv remove python-dotenv && uv add python-dotenv # hack to get python-dotenv working
 
 .PHONY: resetup
 resetup: remove-venv setup			# Recreate the virtual environment from scratch
