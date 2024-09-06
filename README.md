@@ -2,6 +2,8 @@
 
 PAR Scrape is a versatile web scraping tool with options for Selenium or Playwright, featuring OpenAI-powered data extraction and formatting.
 
+![PAR Scrape Screenshot](Screenshot.png)
+
 ## Features
 
 - Web scraping using Selenium or Playwright
