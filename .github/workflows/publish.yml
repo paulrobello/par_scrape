@@ -63,7 +63,7 @@ jobs:
         id: get_version
         run: |
           # Extract the version from the __init__.py file
-          VERSION=$(python -c "exec(open('./par_scrape/__init__.py').read()); print(__version__)")
+          VERSION=$(python -c "exec(open('./src/par_scrape/__init__.py').read()); print(__version__)")
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: App VERSION
@@ -128,7 +128,7 @@ jobs:
         id: get_version
         run: |
           # Extract the version from the __init__.py file
-          VERSION=$(python -c "exec(open('./par_scrape/__init__.py').read()); print(__version__)")
+          VERSION=$(python -c "exec(open('./src/par_scrape/__init__.py').read()); print(__version__)")
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Check Do Release
