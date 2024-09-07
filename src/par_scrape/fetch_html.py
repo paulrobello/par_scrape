@@ -104,14 +104,18 @@ async def setup_selenium(headless: bool = True) -> WebDriver:
         raise
 
 
-async def fetch_html_selenium(url: str, headless: bool = True, sleep_time: int = 5) -> str:
+async def fetch_html_selenium(url: str, headless: bool = True, sleep_time: int = 5, pause: bool = False) -> str:
     """Fetch HTML content from a URL using Selenium."""
     driver = await setup_selenium(headless)
     try:
         await asyncio.to_thread(driver.get, url)
 
-        # Add delays to mimic human behavior
-        await asyncio.sleep(sleep_time)  # Use the specified sleep time
+        if pause:
+            console.print("[yellow]Press Enter to continue...[/yellow]")
+            await asyncio.to_thread(input)
+        else:
+            # Add delays to mimic human behavior
+            await asyncio.sleep(sleep_time)  # Use the specified sleep time
 
         # Add more realistic actions like scrolling
         await asyncio.to_thread(
@@ -125,7 +129,7 @@ async def fetch_html_selenium(url: str, headless: bool = True, sleep_time: int =
         await asyncio.to_thread(driver.quit)
 
 
-async def fetch_html_playwright(url: str, sleep_time: int = 5) -> str:
+async def fetch_html_playwright(url: str, sleep_time: int = 5, pause: bool = False) -> str:
     """
     Fetch HTML content from a URL using Playwright.
 
@@ -140,8 +144,12 @@ async def fetch_html_playwright(url: str, sleep_time: int = 5) -> str:
         page = await browser.new_page()
         await page.goto(url)
 
-        # Add delays to mimic human behavior
-        await asyncio.sleep(sleep_time)  # Use the specified sleep time
+        if pause:
+            console.print("[yellow]Press Enter to continue...[/yellow]")
+            await asyncio.to_thread(input)
+        else:
+            # Add delays to mimic human behavior
+            await asyncio.sleep(sleep_time)  # Use the specified sleep time
 
         # Add more realistic actions like scrolling
         await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
