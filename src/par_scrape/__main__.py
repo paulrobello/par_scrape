@@ -72,7 +72,7 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-# pylint: disable=too-many-statements,dangerous-default-value,too-many-arguments
+# pylint: disable=too-many-statements,dangerous-default-value,too-many-arguments, too-many-locals
 @app.command()
 def main(
     url: Annotated[
