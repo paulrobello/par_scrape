@@ -104,7 +104,9 @@ async def setup_selenium(headless: bool = True) -> WebDriver:
         raise
 
 
-async def fetch_html_selenium(url: str, headless: bool = True, sleep_time: int = 5, pause: bool = False) -> str:
+async def fetch_html_selenium(
+    url: str, headless: bool = True, sleep_time: int = 5, pause: bool = False
+) -> str:
     """Fetch HTML content from a URL using Selenium."""
     driver = await setup_selenium(headless)
     try:
@@ -121,7 +123,9 @@ async def fetch_html_selenium(url: str, headless: bool = True, sleep_time: int =
         await asyncio.to_thread(
             driver.execute_script, "window.scrollTo(0, document.body.scrollHeight);"
         )
-        await asyncio.sleep(random.uniform(3, 5))  # Simulate time taken to scroll and read
+        await asyncio.sleep(
+            random.uniform(3, 5)
+        )  # Simulate time taken to scroll and read
 
         html = await asyncio.to_thread(lambda: driver.page_source)
         return html
@@ -129,7 +133,9 @@ async def fetch_html_selenium(url: str, headless: bool = True, sleep_time: int =
         await asyncio.to_thread(driver.quit)
 
 
-async def fetch_html_playwright(url: str, sleep_time: int = 5, pause: bool = False) -> str:
+async def fetch_html_playwright(
+    url: str, sleep_time: int = 5, pause: bool = False
+) -> str:
     """
     Fetch HTML content from a URL using Playwright.
 
