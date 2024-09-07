@@ -39,7 +39,7 @@ from par_scrape.fetch_html import (
 from par_scrape.pricing import calculate_price
 from par_scrape.utils import console
 from par_scrape import __version__, __application_title__
-from par_scrape.lib.llm_providers import LlmProvider
+from par_scrape.lib.llm_providers import LlmProvider, provider_default_models
 
 # Load the .env file from the project folder
 load_dotenv(dotenv_path=".env")
@@ -119,13 +119,13 @@ def main(
             "--pause", "-p", help="Wait for user input before closing browser"
         ),
     ] = False,
-    model: Annotated[
-        str, typer.Option("--model", "-m", help="AI model to use for processing")
-    ] = "gpt-4o-mini",
     ai_provider: Annotated[
         LlmProvider,
         typer.Option("--ai-provider", "-a", help="AI provider to use for processing"),
     ] = LlmProvider.OPENAI,
+    model: Annotated[
+        str, typer.Option("--model", "-m", help="AI model to use for processing")
+    ] = provider_default_models[LlmProvider.OPENAI],
     display_output: Annotated[
         Optional[DisplayOutputFormat],
         typer.Option(
