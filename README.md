@@ -45,16 +45,21 @@ Then, follow these steps:
 To install PAR Scrape from PyPI, run any of the following commands:
 
 ```bash
-uv tool install par_scrape
+uv tool install par-scrape
 ```
 
 ```bash
-pipx install par_scrape
+pipx install par-scrape
 ```
 
 ## Usage
 
 To use PAR Scrape, you can run it from the command line with various options. Here's a basic example:
+Ensure you have your OPENAI_API_KEY set in your environment.  
+You can also store your key in the file `~/.par-scrape.env` as follows:
+```
+OPENAI_API_KEY=your_api_key
+```
 
 ### Running from source
 ```bash
