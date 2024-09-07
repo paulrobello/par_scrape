@@ -36,10 +36,14 @@ from par_scrape.fetch_html import (
     fetch_html_playwright,
     html_to_markdown_with_readability,
 )
-from par_scrape.pricing import calculate_price
+from par_scrape.pricing import display_price_summary
 from par_scrape.utils import console
 from par_scrape import __version__, __application_title__
-from par_scrape.lib.llm_providers import LlmProvider, provider_default_models
+from par_scrape.lib.llm_providers import (
+    LlmProvider,
+    provider_default_models,
+    provider_env_key_names,
+)
 
 # Load the .env file from the project folder
 load_dotenv(dotenv_path=".env")
@@ -48,6 +52,15 @@ load_dotenv(dotenv_path=Path("~/.par-scrape.env").expanduser())
 
 # Initialize Typer app
 app = typer.Typer(help="Web scraping tool with options for Selenium or Playwright")
+
+
+class CleanupType(str, Enum):
+    """Enum for cleanup choices."""
+
+    NONE = "none"
+    BEFORE = "before"
+    AFTER = "after"
+    BOTH = "both"
 
 
 class DisplayOutputFormat(str, Enum):
@@ -97,12 +110,6 @@ def main(
             case_sensitive=False,
         ),
     ] = ScraperChoice.SELENIUM,
-    remove_output: Annotated[
-        bool,
-        typer.Option(
-            "--remove-output", "-r", help="Remove output folder before running"
-        ),
-    ] = False,
     headless: Annotated[
         bool,
         typer.Option("--headless", "-h", help="Run in headless mode (for Selenium)"),
@@ -124,8 +131,13 @@ def main(
         typer.Option("--ai-provider", "-a", help="AI provider to use for processing"),
     ] = LlmProvider.OPENAI,
     model: Annotated[
-        str, typer.Option("--model", "-m", help="AI model to use for processing")
-    ] = provider_default_models[LlmProvider.OPENAI],
+        Optional[str],
+        typer.Option(
+            "--model",
+            "-m",
+            help="AI model to use for processing. If not specified, a default model will be used.",
+        ),
+    ] = None,
     display_output: Annotated[
         Optional[DisplayOutputFormat],
         typer.Option(
@@ -153,22 +165,26 @@ def main(
         typer.Option("--version", "-v", callback=version_callback, is_eager=True),
     ] = None,
     cleanup: Annotated[
-        bool,
-        typer.Option("--cleanup", "-c", help="Remove output folder before exiting"),
-    ] = False,
+        CleanupType,
+        typer.Option("--cleanup", "-c", help="How to handle cleanup of output folder."),
+    ] = CleanupType.NONE,
 ):
     """Scrape and analyze data from a website."""
+    if not model:
+        model = provider_default_models[ai_provider]
 
     async def _main():  # pylint: disable=too-many-locals, too-many-branches, too-many-statements
         """Scrape and analyze data from a website."""
         nonlocal run_name
-        if not os.environ.get("OPENAI_API_KEY"):
-            console.print(
-                "[bold red]OPENAI_API_KEY environment variable not set. Exiting...[/bold red]"
-            )
-            raise typer.Exit(1)
+        if ai_provider != LlmProvider.OLLAMA:
+            key_name = provider_env_key_names[ai_provider]
+            if not os.environ.get(key_name):
+                console.print(
+                    f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]"
+                )
+                raise typer.Exit(1)
         with console.capture() if silent else nullcontext():
-            if remove_output:
+            if cleanup in [CleanupType.BEFORE, CleanupType.BOTH]:
                 if await aos.path.exists(output_folder):
                     shutil.rmtree(output_folder)
                     console.print(
@@ -193,11 +209,11 @@ def main(
                             ("URL: ", "cyan"),
                             (f"{url}", "green"),
                             "\n",
-                            ("Model: ", "cyan"),
-                            (f"{model}", "green"),
-                            "\n",
                             ("AI Provider: ", "cyan"),
                             (f"{ai_provider.value}", "green"),
+                            "\n",
+                            ("Model: ", "cyan"),
+                            (f"{model}", "green"),
                             "\n",
                             ("Scraper: ", "cyan"),
                             (f"{scraper}", "green"),
@@ -219,6 +235,9 @@ def main(
                             "\n",
                             ("Silent mode: ", "cyan"),
                             (f"{silent}", "green"),
+                            "\n",
+                            ("Cleanup: ", "cyan"),
+                            (f"{cleanup}", "green"),
                         ),
                         title="[bold]Scraping Configuration",
                         border_style="bold",
@@ -292,34 +311,16 @@ def main(
                             f"[bold red]Invalid output type: {display_output.value}[/bold red]"
                         )
 
-                # Automatically calculate the token usage and cost for all input and output
-                status.update("[bold cyan]Calculating token usage and cost...")
-                input_tokens, output_tokens, total_cost = await calculate_price(
-                    markdown, formatted_data_text, model=model
-                )
-
-                console.print(
-                    Panel.fit(
-                        Text.assemble(
-                            ("Input token count: ", "cyan"),
-                            (f"{input_tokens}", "green"),
-                            "\n",
-                            ("Output token count: ", "cyan"),
-                            (f"{output_tokens}", "green"),
-                            "\n",
-                            ("Estimated total cost: ", "cyan"),
-                            (f"${total_cost:.4f}", "green bold"),
-                        ),
-                        title="[bold]Summary",
-                        border_style="bold",
-                    )
+                await display_price_summary(
+                    status, model, markdown, formatted_data_text
                 )
 
             except Exception as e:  # pylint: disable=broad-except
+                print(e)
                 console.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
 
             finally:
-                if cleanup:
+                if cleanup in [CleanupType.BOTH, CleanupType.AFTER]:
                     with console.status("[bold yellow]Cleaning up..."):
                         if await aos.path.exists(output_folder):
                             await asyncio.to_thread(shutil.rmtree, output_folder)
