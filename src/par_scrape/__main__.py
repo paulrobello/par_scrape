@@ -105,7 +105,7 @@ def main(
     headless: Annotated[
         bool,
         typer.Option("--headless", "-h", help="Run in headless mode (for Selenium)"),
-    ] = True,
+    ] = False,
     model: Annotated[
         str, typer.Option("--model", "-m", help="OpenAI model to use for processing")
     ] = "gpt-4o-mini",
@@ -122,7 +122,7 @@ def main(
         typer.Option(
             "--output-folder", "-o", help="Specify the location of the output folder"
         ),
-    ] = "./output",
+    ] = Path("./output"),
     silent: Annotated[
         bool,
         typer.Option("--silent", "-q", help="Run in silent mode, suppressing output"),

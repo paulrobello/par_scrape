@@ -112,7 +112,7 @@ async def fetch_html_selenium(url: str, headless: bool = True) -> str:
 
         # Add random delays to mimic human behavior
         await asyncio.sleep(
-            random.uniform(3, 6)
+            5
         )  # Adjust this to simulate time for user to read or interact
 
         # Add more realistic actions like scrolling
