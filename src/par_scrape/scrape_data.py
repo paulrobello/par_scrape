@@ -7,10 +7,7 @@ from typing import List, Type, Tuple, Dict
 
 import aiofiles
 import pandas as pd
-import tiktoken
 from aiofiles import os as aos
-from langchain_core.language_models import BaseChatModel
-from openai import AsyncOpenAI, OpenAIError
 from pydantic import BaseModel, create_model, ConfigDict
 from rich.panel import Panel
 
@@ -78,28 +75,11 @@ def create_listings_container_model(listing_model: Type[BaseModel]) -> Type[Base
     return create_model("DynamicListingsContainer", listings=(List[listing_model], ...))
 
 
-def trim_to_token_limit(text: str, model: str, max_tokens: int = 200000) -> str:
-    """
-    Trim text to a specified token limit for a given model.
-
-    Args:
-        text (str): The input text to trim.
-        model (str): The model name to use for tokenization.
-        max_tokens (int, optional): The maximum number of tokens. Defaults to 200000.
-
-    Returns:
-        str: The trimmed text.
-    """
-    encoder = tiktoken.encoding_for_model(model)
-    tokens = encoder.encode(text)
-    if len(tokens) > max_tokens:
-        trimmed_text = encoder.decode(tokens[:max_tokens])
-        return trimmed_text
-    return text
-
-
 async def format_data(
-    data: str, dynamic_listings_container: Type[BaseModel], model: str, ai_provider: LlmProvider
+    data: str,
+    dynamic_listings_container: Type[BaseModel],
+    model: str,
+    ai_provider: LlmProvider,
 ) -> BaseModel:
     """
     Format data using the specified AI provider's API asynchronously.
@@ -113,27 +93,32 @@ async def format_data(
     Returns:
         BaseModel: The formatted data as a Pydantic model instance.
     """
-
     system_message = """
 You are an intelligent text extraction and conversion assistant. Your task is to extract structured information
 from the given text and convert it into a pure JSON format. The JSON should contain only the structured data extracted from the text,
 with no additional commentary, explanations, or extraneous information.
 You could encounter cases where you can't find the data of the fields you have to extract or the data will be in a foreign language.
-Please process the following text and provide the output in pure JSON format with no words before or after the JSON:"""
-
+Please process the following text and provide the output in pure JSON format with no words before or after the JSON:
+Make sure to call the DynamicListingsContainer function with the extracted data."""
     user_message = f"Extract the following information from the provided text:\nPage content:\n\n{data}"
 
     try:
-        llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0.25)
+        llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0)
         chat_model = llm_config.build_chat_model()
-        structure_model = chat_model.with_structured_output(dynamic_listings_container)
-        return await structure_model.ainvoke(
+        structure_model = chat_model.with_structured_output(
+            dynamic_listings_container  # , include_raw=True
+        )
+        data = await structure_model.ainvoke(
             [
                 ("system", system_message),
                 ("user", user_message),
             ]
-        )
-    except Exception as e:
+        )  # type: ignore
+        if isinstance(data, BaseModel):
+            return data
+        console.print(data)
+        raise ValueError("Error in API call. Did not return a Pydantic BaseModel")
+    except Exception as e:  # pylint: disable=broad-exception-caught
         console.print(
             f"[bold red]Error in API call or parsing response:[/bold red] {str(e)}"
         )

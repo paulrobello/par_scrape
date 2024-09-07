@@ -4,6 +4,11 @@ from typing import Tuple
 import asyncio
 
 import tiktoken
+from rich.panel import Panel
+from rich.status import Status
+from rich.text import Text
+
+from par_scrape.utils import console, estimate_tokens
 
 pricing = {
     "gpt-4o": {
@@ -46,6 +51,22 @@ pricing = {
         "input": 0.0000005,  # $0.50 per 1M input tokens
         "output": 0.0000015,  # $1.50 per 1M output tokens
     },
+    "claude-3-5-sonnet-20240620": {
+        "input": 0.000003,  # $3.0 per 1M input tokens
+        "output": 0.000015,  # $15.0 per 1M output tokens
+    },
+    "claude-3-haiku-20240307": {
+        "input": 0.00000025,  # $0.25 per 1M input tokens
+        "output": 0.00000125,  # $1.25 per 1M output tokens
+    },
+    "claude-3-sonnet-20240229": {
+        "input": 0.000003,  # $3.0 per 1M input tokens
+        "output": 0.000015,  # $15.0 per 1M output tokens
+    },
+    "claude-3-opus-20240229": {
+        "input": 0.000015,  # $15.0 per 1M input tokens
+        "output": 0.000075,  # $75.0 per 1M output tokens
+    },
 }
 
 
@@ -64,23 +85,74 @@ async def calculate_price(
         Tuple[int, int, float]: A tuple containing the input token count, output token count, and total cost.
         Returns (0, 0, 0.0) if there's an error during calculation.
     """
+    input_token_count = 0
+    output_token_count = 0
+    total_cost = 0.0
     try:
-        # Initialize the encoder for the specific model
-        encoder = tiktoken.encoding_for_model(model)
+        try:
+            # Initialize the encoder for the specific model
+            encoder = tiktoken.encoding_for_model(model)
 
-        # Encode the input text to get the number of input tokens
-        input_token_count = await asyncio.to_thread(len, encoder.encode(input_text))
+            # Encode the input text to get the number of input tokens
+            input_token_count = await asyncio.to_thread(len, encoder.encode(input_text))
 
-        # Encode the output text to get the number of output tokens
-        output_token_count = await asyncio.to_thread(len, encoder.encode(output_text))
+            # Encode the output text to get the number of output tokens
+            output_token_count = await asyncio.to_thread(
+                len, encoder.encode(output_text)
+            )
+        except Exception as _:  # pylint: disable=broad-except
+            console.print(
+                Panel.fit(
+                    Text.assemble(
+                        ("Could not get encoder. Falling back to estimator.", "yellow")
+                    )
+                )
+            )
+            input_token_count = estimate_tokens(input_text)
+            output_token_count = estimate_tokens(output_text)
 
         # Calculate the costs
         # Convert price per million tokens to price per token, then multiply by token count
         input_cost = input_token_count * pricing[model]["input"]
         output_cost = output_token_count * pricing[model]["output"]
         total_cost = input_cost + output_cost
+    except Exception as _:  # pylint: disable=broad-except
+        console.print(
+            Panel.fit(
+                Text.assemble(("Error calculating token usage and or cost.", "red"))
+            )
+        )
+    return input_token_count, output_token_count, total_cost
 
-        return input_token_count, output_token_count, total_cost
-    except Exception as e:  # pylint: disable=broad-except
-        print(f"Error calculating price: {str(e)}")
-        return 0, 0, 0.0
+
+async def display_price_summary(
+    status: Status, model: str, markdown, formatted_data_text
+) -> None:
+    """Display the price summary."""
+    status.update("[bold cyan]Calculating token usage and cost...")
+    input_tokens, output_tokens, total_cost = await calculate_price(
+        markdown, formatted_data_text, model=model
+    )
+    if input_tokens == 0 or output_tokens == 0:
+        console.print(
+            Panel.fit(
+                Text.assemble(("Could not calculate token usage and cost.", "yellow"))
+            )
+        )
+    else:
+        console.print(
+            Panel.fit(
+                Text.assemble(
+                    ("Input token count: ", "cyan"),
+                    (f"{input_tokens}", "green"),
+                    "\n",
+                    ("Output token count: ", "cyan"),
+                    (f"{output_tokens}", "green"),
+                    "\n",
+                    ("Estimated total cost: ", "cyan"),
+                    (f"${total_cost:.4f}", "green bold"),
+                ),
+                title="[bold]Summary",
+                border_style="bold",
+            )
+        )

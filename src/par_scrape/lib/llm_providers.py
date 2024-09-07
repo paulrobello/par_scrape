@@ -17,11 +17,20 @@ class LlmProvider(str, Enum):
 
 provider_default_models: dict[LlmProvider, str] = {
     LlmProvider.OLLAMA: "llama3.1:8b",
-    LlmProvider.OPENAI: "gpt-4o",
+    LlmProvider.OPENAI: "gpt-4o-mini",
     LlmProvider.GROQ: "llama3-70b-8192",
     LlmProvider.ANTHROPIC: "claude-3-5-sonnet-20240620",
     LlmProvider.GOOGLE: "gemini-pro",
 }
+
+provider_env_key_names: dict[LlmProvider, str] = {
+    LlmProvider.OLLAMA: "",
+    LlmProvider.OPENAI: "OPENAI_API_KEY",
+    LlmProvider.GROQ: "GROQ_API_KEY",
+    LlmProvider.ANTHROPIC: "ANTHROPIC_API_KEY",
+    LlmProvider.GOOGLE: "GOOGLE_API_KEY",
+}
+
 
 llm_provider_types: list[LlmProvider] = list(LlmProvider)
 provider_select_options: list[tuple[str, LlmProvider]] = [

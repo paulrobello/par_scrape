@@ -55,10 +55,20 @@ pipx install par-scrape
 ## Usage
 
 To use PAR Scrape, you can run it from the command line with various options. Here's a basic example:
-Ensure you have your OPENAI_API_KEY set in your environment.  
+Ensure you have the AI provider api key in your environment.
+The key names for supported providers are as follows:
+- OpenAI: `OPENAI_API_KEY`
+- Anthropic: `ANTHROPIC_API_KEY`
+- Google: `GOOGLE_API_KEY`
+- Groq: `GROQ_API_KEY`
+- Ollama: `Not needed`
+
 You can also store your key in the file `~/.par-scrape.env` as follows:
 ```
 OPENAI_API_KEY=your_api_key
+ANTHROPIC_API_KEY=your_api_key
+GOOGLE_API_KEY=your_api_key
+GROQ_API_KEY=your_api_key
 ```
 
 ### Running from source
@@ -76,19 +86,18 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 - `--url`, `-u`: The URL to scrape (default: "https://openai.com/api/pricing/")
 - `--fields`, `-f`: Fields to extract from the webpage (default: ["Model", "Pricing Input", "Pricing Output"])
 - `--scraper`: Scraper to use: 'selenium' or 'playwright' (default: "selenium")
-- `--remove-output`, `-r`: Remove output folder before running
 - `--headless`, `-h`: Run in headless mode (for Selenium) (default: False)
 - `--sleep-time`, `-t`: Time to sleep (in seconds) before scrolling and closing browser (default: 5)
 - `--pause`, `-p`: Wait for user input before closing browser
-- `--model`, `-m`: AI model to use for processing. If not specified, a default model will be used based on the provider.
 - `--ai-provider`, `-a`: AI provider to use for processing (default: "OpenAI")
+- `--model`, `-m`: AI model to use for processing. If not specified, a default model will be used based on the provider.
 - `--pricing`: Enable pricing summary display (default: False)
 - `--display-output`, `-d`: Display output in terminal (md, csv, or json)
 - `--output-folder`, `-o`: Specify the location of the output folder (default: "./output")
 - `--silent`, `-s`: Run in silent mode, suppressing output
 - `--run-name`, `-n`: Specify a name for this run
 - `--version`, `-v`: Show the version and exit
-- `--cleanup`, `-c`: Remove output folder before exiting
+- `--cleanup`, `-c`: [none|before|after|both] If and when to remove the output folder (default: none)
 
 ### Examples
 
@@ -121,6 +130,19 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```bash
 par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --pause --pricing
 ```
+
+## Whats New
+- Version 0.4.0:
+  - Added support for Anthropic, Google, Groq, and Ollama. (Not well tested with any providers other than OpenAI)
+  - Add flag for displaying pricing summary. Defaults to False.
+  - Added pricing data for Anthropic.
+  - Better error handling for llm calls.
+  - Updated cleanup flag to handle both before and after cleanup. Removed --remove-output-folder flag.
+- Version 0.3.1:
+  - Add pause and sleep-time options to control the browser and scraping delays.
+  - Default headless mode to False so you can interact with the browser.
+- Version 0.3.0:
+  - Fixed location of config.json file.
 
 ## Contributing
 

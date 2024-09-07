@@ -26,6 +26,7 @@ class ParOllamaEmbeddings(BaseModel, Embeddings):
     _ollama_host: str = "localhost"
     """Model name to use."""
 
+    # pylint: disable=too-few-public-methods
     class Config:
         """Configuration for this pydantic object."""
 

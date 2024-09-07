@@ -21,6 +21,7 @@ from langchain_openai import ChatOpenAI
 from langchain_openai import OpenAI
 from langchain_openai import OpenAIEmbeddings
 
+
 from par_scrape.lib.llm_providers import LlmProvider
 from par_scrape.lib.par_ollama_embeddings import ParOllamaEmbeddings
 
@@ -119,7 +120,11 @@ class LlmConfig:
                     f"{self.provider} provider does not support mode {self.mode}"
                 )
             if self.mode == LlmMode.CHAT:
-                return ChatGroq(model=self.model_name, temperature=self.temperature, streaming=self.streaming)  # type: ignore
+                return ChatGroq(
+                    model=self.model_name,
+                    temperature=self.temperature,
+                    streaming=self.streaming,
+                )  # pyright: ignore [reportCallIssue]
             if self.mode == LlmMode.EMBEDDINGS:
                 raise ValueError(
                     f"{self.provider} provider does not support mode {self.mode}"
@@ -134,6 +139,8 @@ class LlmConfig:
                     model=self.model_name,  # pyright: ignore [reportCallIssue]
                     temperature=self.temperature,
                     streaming=self.streaming,
+                    default_headers={"anthropic-beta": "tools-2024-05-16"},
+                    # max_tokens=8_192,
                 )
             if self.mode == LlmMode.EMBEDDINGS:
                 raise ValueError(
