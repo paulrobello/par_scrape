@@ -50,7 +50,7 @@ async def setup_selenium(headless: bool = True) -> WebDriver:
     )
 
     # Load ChromeDriver path from config.json
-    config_path = Path("config.json")
+    config_path = Path("~/.par-scrape.config.json").expanduser()
     if config_path.exists():
         async with aiofiles.open(config_path, "rt", encoding="utf-8") as config_file:
             config = json.loads(await config_file.read())
