@@ -75,15 +75,15 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 
 - `--url`, `-u`: The URL to scrape (default: "https://openai.com/api/pricing/")
 - `--fields`, `-f`: Fields to extract from the webpage (default: ["Model", "Pricing Input", "Pricing Output"])
-- `--scraper`, `-s`: Scraper to use: 'selenium' or 'playwright' (default: "selenium")
+- `--scraper`: Scraper to use: 'selenium' or 'playwright' (default: "selenium")
 - `--remove-output`, `-r`: Remove output folder before running
 - `--headless`, `-h`: Run in headless mode (for Selenium) (default: False)
-- `--sleep-time`, `-t`: Time to sleep before scrolling (in seconds) (default: 5)
-- `--pause`, `-p`: Wait for user input before scrolling
+- `--sleep-time`, `-t`: Time to sleep (in seconds) before scrolling and closing browser (default: 5)
+- `--pause`, `-p`: Wait for user input before closing browser
 - `--model`, `-m`: OpenAI model to use for processing (default: "gpt-4o-mini")
 - `--display-output`, `-d`: Display output in terminal (md, csv, or json)
 - `--output-folder`, `-o`: Specify the location of the output folder (default: "./output")
-- `--silent`, `-q`: Run in silent mode, suppressing output
+- `--silent`, `-s`: Run in silent mode, suppressing output
 - `--run-name`, `-n`: Specify a name for this run
 - `--version`, `-v`: Show the version and exit
 - `--cleanup`, `-c`: Remove output folder before exiting
@@ -92,32 +92,32 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 
 1. Basic usage with default options:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" --fields "Model" "Pricing Input" "Pricing Output"
+par_scrape --url "https://openai.com/api/pricing/" -f "Model" -f "Pricing Input" -f "Pricing Output"
 ```
 
 2. Using Playwright and displaying JSON output:
 ```bash
-par_scrape --url "https://example.com" --fields "Title" "Description" "Price" --scraper playwright --display-output json
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --scraper playwright -d json
 ```
 
 3. Specifying a custom model and output folder:
 ```bash
-par_scrape --url "https://example.com" --fields "Title" "Description" "Price" --model gpt-4 --output-folder ./custom_output
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --model gpt-4 --output-folder ./custom_output
 ```
 
 4. Running in silent mode with a custom run name:
 ```bash
-par_scrape --url "https://example.com" --fields "Title" "Description" "Price" --silent --run-name my_custom_run
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --silent --run-name my_custom_run
 ```
 
 5. Using the cleanup option to remove the output folder after scraping:
 ```bash
-par_scrape --url "https://example.com" --fields "Title" "Description" "Price" --cleanup
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --cleanup
 ```
 
 6. Using the pause option to wait for user input before scrolling:
 ```bash
-par_scrape --url "https://example.com" --fields "Title" "Description" "Price" --pause
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price"  --pause
 ```
 
 ## Contributing

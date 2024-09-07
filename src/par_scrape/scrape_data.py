@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 from typing import List, Type, Tuple, Dict
 
 import aiofiles
@@ -15,9 +16,7 @@ from rich.panel import Panel
 from par_scrape.utils import console
 
 
-async def save_raw_data(
-    raw_data: str, run_name: str, output_folder: str = "output"
-) -> str:
+async def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
     """
     Save raw data to a file.
 
@@ -57,8 +56,8 @@ def create_dynamic_listing_model(field_names: List[str]) -> Type[BaseModel]:
     # Dynamically create the model with all fields
     dynamic_listing_model = create_model(
         "DynamicListingModel",
-        **field_definitions,
-    )
+        **field_definitions,  # type: ignore
+    )  # type: ignore
     dynamic_listing_model.model_config = ConfigDict(arbitrary_types_allowed=True)
     return dynamic_listing_model
 
@@ -130,7 +129,7 @@ Please process the following text and provide the output in pure JSON format wit
             ],
             response_format=dynamic_listings_container,
         )
-        return completion.choices[0].message.parsed
+        return completion.choices[0].message.parsed  # type: ignore
     except (OpenAIError, json.JSONDecodeError) as e:
         console.print(
             f"[bold red]Error in API call or parsing response:[/bold red] {str(e)}"
@@ -139,7 +138,7 @@ Please process the following text and provide the output in pure JSON format wit
 
 
 async def save_formatted_data(
-    formatted_data: BaseModel, run_name: str, output_folder: str = "output"
+    formatted_data: BaseModel, run_name: str, output_folder: Path
 ) -> Tuple[pd.DataFrame | None, Dict[str, str]]:
     """
     Save formatted data to JSON, Excel, CSV, and Markdown files.
