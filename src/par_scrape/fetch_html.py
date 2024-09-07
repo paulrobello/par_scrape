@@ -104,24 +104,20 @@ async def setup_selenium(headless: bool = True) -> WebDriver:
         raise
 
 
-async def fetch_html_selenium(url: str, headless: bool = True) -> str:
+async def fetch_html_selenium(url: str, headless: bool = True, sleep_time: int = 5) -> str:
     """Fetch HTML content from a URL using Selenium."""
     driver = await setup_selenium(headless)
     try:
         await asyncio.to_thread(driver.get, url)
 
-        # Add random delays to mimic human behavior
-        await asyncio.sleep(
-            5
-        )  # Adjust this to simulate time for user to read or interact
+        # Add delays to mimic human behavior
+        await asyncio.sleep(sleep_time)  # Use the specified sleep time
 
         # Add more realistic actions like scrolling
         await asyncio.to_thread(
             driver.execute_script, "window.scrollTo(0, document.body.scrollHeight);"
         )
-        await asyncio.sleep(
-            random.uniform(3, 5)
-        )  # Simulate time taken to scroll and read
+        await asyncio.sleep(random.uniform(3, 5))  # Simulate time taken to scroll and read
 
         html = await asyncio.to_thread(lambda: driver.page_source)
         return html
@@ -129,7 +125,7 @@ async def fetch_html_selenium(url: str, headless: bool = True) -> str:
         await asyncio.to_thread(driver.quit)
 
 
-async def fetch_html_playwright(url: str) -> str:
+async def fetch_html_playwright(url: str, sleep_time: int = 5) -> str:
     """
     Fetch HTML content from a URL using Playwright.
 
@@ -144,10 +140,8 @@ async def fetch_html_playwright(url: str) -> str:
         page = await browser.new_page()
         await page.goto(url)
 
-        # Add random delays to mimic human behavior
-        await asyncio.sleep(
-            3
-        )  # Adjust this to simulate time for user to read or interact
+        # Add delays to mimic human behavior
+        await asyncio.sleep(sleep_time)  # Use the specified sleep time
 
         # Add more realistic actions like scrolling
         await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")

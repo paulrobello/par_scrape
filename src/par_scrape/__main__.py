@@ -106,6 +106,10 @@ def main(
         bool,
         typer.Option("--headless", "-h", help="Run in headless mode (for Selenium)"),
     ] = False,
+    sleep_time: Annotated[
+        int,
+        typer.Option("--sleep-time", "-t", help="Time to sleep before scrolling (in seconds)"),
+    ] = 5,
     model: Annotated[
         str, typer.Option("--model", "-m", help="OpenAI model to use for processing")
     ] = "gpt-4o-mini",
@@ -205,9 +209,9 @@ def main(
                     # Scrape data
                     status.update("[bold cyan]Fetching HTML...")
                     if scraper == ScraperChoice.PLAYWRIGHT:
-                        raw_html = await fetch_html_playwright(url)
+                        raw_html = await fetch_html_playwright(url, sleep_time)
                     else:
-                        raw_html = await fetch_html_selenium(url, headless)
+                        raw_html = await fetch_html_selenium(url, headless, sleep_time)
 
                     status.update("[bold cyan]Converting HTML to Markdown...")
                     markdown = await html_to_markdown_with_readability(raw_html)
