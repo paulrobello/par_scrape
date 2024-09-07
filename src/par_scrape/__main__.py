@@ -164,6 +164,10 @@ def main(
         Optional[bool],
         typer.Option("--version", "-v", callback=version_callback, is_eager=True),
     ] = None,
+    pricing: Annotated[
+        bool,
+        typer.Option("--pricing", help="Enable pricing summary display"),
+    ] = False,
     cleanup: Annotated[
         CleanupType,
         typer.Option("--cleanup", "-c", help="How to handle cleanup of output folder."),
@@ -311,9 +315,10 @@ def main(
                             f"[bold red]Invalid output type: {display_output.value}[/bold red]"
                         )
 
-                await display_price_summary(
-                    status, model, markdown, formatted_data_text
-                )
+                if pricing:
+                    await display_price_summary(
+                        status, model, markdown, formatted_data_text
+                    )
 
             except Exception as e:  # pylint: disable=broad-except
                 print(e)
