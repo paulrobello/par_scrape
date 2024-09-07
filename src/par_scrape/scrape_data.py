@@ -14,7 +14,9 @@ from openai import AsyncOpenAI, OpenAIError
 from pydantic import BaseModel, create_model, ConfigDict
 from rich.panel import Panel
 
-from par_scrape.utils import console, build_chat_model
+from par_scrape.utils import console
+from par_scrape.lib.llm_config import LlmConfig
+from par_scrape.lib.llm_providers import LlmProvider
 
 
 async def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
@@ -97,15 +99,16 @@ def trim_to_token_limit(text: str, model: str, max_tokens: int = 200000) -> str:
 
 
 async def format_data(
-    data: str, dynamic_listings_container: Type[BaseModel], model: str
+    data: str, dynamic_listings_container: Type[BaseModel], model: str, ai_provider: LlmProvider
 ) -> BaseModel:
     """
-    Format data using OpenAI's API asynchronously.
+    Format data using the specified AI provider's API asynchronously.
 
     Args:
         data (str): The input data to format.
         dynamic_listings_container (Type[BaseModel]): The Pydantic model to use for parsing.
-        model (str): The OpenAI model to use for processing.
+        model (str): The AI model to use for processing.
+        ai_provider (LlmProvider): The AI provider to use for processing.
 
     Returns:
         BaseModel: The formatted data as a Pydantic model instance.
@@ -121,15 +124,16 @@ Please process the following text and provide the output in pure JSON format wit
     user_message = f"Extract the following information from the provided text:\nPage content:\n\n{data}"
 
     try:
-        model: BaseChatModel = build_chat_model(temperature=0.25)
-        structure_model = model.with_structured_output(dynamic_listings_container)
+        llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0.25)
+        chat_model = llm_config.build_chat_model()
+        structure_model = chat_model.with_structured_output(dynamic_listings_container)
         return await structure_model.ainvoke(
             [
                 ("system", system_message),
                 ("user", user_message),
             ]
         )
-    except (OpenAIError, json.JSONDecodeError) as e:
+    except Exception as e:
         console.print(
             f"[bold red]Error in API call or parsing response:[/bold red] {str(e)}"
         )

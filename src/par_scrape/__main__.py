@@ -39,6 +39,7 @@ from par_scrape.fetch_html import (
 from par_scrape.pricing import calculate_price
 from par_scrape.utils import console
 from par_scrape import __version__, __application_title__
+from par_scrape.lib.llm_providers import LlmProvider
 
 # Load the .env file from the project folder
 load_dotenv(dotenv_path=".env")
@@ -119,8 +120,12 @@ def main(
         ),
     ] = False,
     model: Annotated[
-        str, typer.Option("--model", "-m", help="OpenAI model to use for processing")
+        str, typer.Option("--model", "-m", help="AI model to use for processing")
     ] = "gpt-4o-mini",
+    ai_provider: Annotated[
+        LlmProvider,
+        typer.Option("--ai-provider", "-a", help="AI provider to use for processing"),
+    ] = LlmProvider.OPENAI,
     display_output: Annotated[
         Optional[DisplayOutputFormat],
         typer.Option(
@@ -240,7 +245,7 @@ def main(
                     # Format data
                     status.update("[bold cyan]Formatting data...")
                     formatted_data = await format_data(
-                        markdown, dynamic_listings_container, model
+                        markdown, dynamic_listings_container, model, ai_provider
                     )
 
                     # Save formatted data
