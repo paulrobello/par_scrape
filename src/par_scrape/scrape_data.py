@@ -9,11 +9,12 @@ import aiofiles
 import pandas as pd
 import tiktoken
 from aiofiles import os as aos
+from langchain_core.language_models import BaseChatModel
 from openai import AsyncOpenAI, OpenAIError
 from pydantic import BaseModel, create_model, ConfigDict
 from rich.panel import Panel
 
-from par_scrape.utils import console
+from par_scrape.utils import console, build_chat_model
 
 
 async def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
@@ -109,7 +110,6 @@ async def format_data(
     Returns:
         BaseModel: The formatted data as a Pydantic model instance.
     """
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     system_message = """
 You are an intelligent text extraction and conversion assistant. Your task is to extract structured information
@@ -121,15 +121,14 @@ Please process the following text and provide the output in pure JSON format wit
     user_message = f"Extract the following information from the provided text:\nPage content:\n\n{data}"
 
     try:
-        completion = await client.beta.chat.completions.parse(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_message},
-            ],
-            response_format=dynamic_listings_container,
+        model: BaseChatModel = build_chat_model(temperature=0.25)
+        structure_model = model.with_structured_output(dynamic_listings_container)
+        return await structure_model.ainvoke(
+            [
+                ("system", system_message),
+                ("user", user_message),
+            ]
         )
-        return completion.choices[0].message.parsed  # type: ignore
     except (OpenAIError, json.JSONDecodeError) as e:
         console.print(
             f"[bold red]Error in API call or parsing response:[/bold red] {str(e)}"
