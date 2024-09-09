@@ -24,7 +24,7 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 
 ## Known Issues
 - Silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
-- Providers other than OpenAI have not been tested you millage may vary 
+- Providers other than OpenAI have not been tested you millage may vary
 
 ## Installation
 
