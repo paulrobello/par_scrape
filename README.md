@@ -7,7 +7,7 @@
 ![PyPI - License](https://img.shields.io/pypi/l/par-scrape)
 
 ## About
-PAR Scrape is a versatile web scraping tool with options for Selenium or Playwright, featuring OpenAI-powered data extraction and formatting.
+PAR Scrape is a versatile web scraping tool with options for Selenium or Playwright, featuring AI-powered data extraction and formatting.
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/probello3)
 
@@ -17,10 +17,14 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 ## Features
 
 - Web scraping using Selenium or Playwright
-- OpenAI-powered data extraction and formatting
+- AI-powered data extraction and formatting
 - Supports multiple output formats (JSON, Excel, CSV, Markdown)
 - Customizable field extraction
 - Token usage and cost estimation
+
+## Known Issues
+- Silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
+- Providers other than OpenAI have not been tested you millage may vary 
 
 ## Installation
 
@@ -105,33 +109,31 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 ```bash
 par_scrape --url "https://openai.com/api/pricing/" -f "Model" -f "Pricing Input" -f "Pricing Output" --pricing
 ```
-
 2. Using Playwright and displaying JSON output:
 ```bash
 par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --scraper playwright -d json --pricing
 ```
-
 3. Specifying a custom model and output folder:
 ```bash
 par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --model gpt-4 --output-folder ./custom_output --pricing
 ```
-
 4. Running in silent mode with a custom run name:
 ```bash
 par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --silent --run-name my_custom_run --pricing
 ```
-
 5. Using the cleanup option to remove the output folder after scraping:
 ```bash
 par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --cleanup --pricing
 ```
-
 6. Using the pause option to wait for user input before scrolling:
 ```bash
 par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --pause --pricing
 ```
 
 ## Whats New
+- Version 0.4.1:
+  - Minor bug fixes for pricing summary.
+  - Default model for google changed to "gemini-1.5-pro-exp-0827" which is free and usually works well.
 - Version 0.4.0:
   - Added support for Anthropic, Google, Groq, and Ollama. (Not well tested with any providers other than OpenAI)
   - Add flag for displaying pricing summary. Defaults to False.
