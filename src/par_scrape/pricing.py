@@ -112,9 +112,15 @@ async def calculate_price(
             output_token_count = estimate_tokens(output_text)
 
         # Calculate the costs
-        # Convert price per million tokens to price per token, then multiply by token count
-        input_cost = input_token_count * pricing[model]["input"]
-        output_cost = output_token_count * pricing[model]["output"]
+        if model in pricing:
+            pricing_in = pricing[model]["input"]
+            pricing_out = pricing[model]["output"]
+        else:
+            pricing_in = 0
+            pricing_out = 0
+
+        input_cost = input_token_count * pricing_in
+        output_cost = output_token_count * pricing_out
         total_cost = input_cost + output_cost
     except Exception as _:  # pylint: disable=broad-except
         console.print(

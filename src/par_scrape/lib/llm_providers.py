@@ -20,7 +20,7 @@ provider_default_models: dict[LlmProvider, str] = {
     LlmProvider.OPENAI: "gpt-4o-mini",
     LlmProvider.GROQ: "llama3-70b-8192",
     LlmProvider.ANTHROPIC: "claude-3-5-sonnet-20240620",
-    LlmProvider.GOOGLE: "gemini-pro",
+    LlmProvider.GOOGLE: "gemini-1.5-pro-exp-0827",
 }
 
 provider_env_key_names: dict[LlmProvider, str] = {
