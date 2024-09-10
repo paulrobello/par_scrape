@@ -231,7 +231,10 @@ def main(
                             (f"{headless if not is_local_file else 'N/A'}", "green"),
                             "\n",
                             ("Sleep Time: ", "cyan"),
-                            (f"{sleep_time if not is_local_file else 'N/A'} seconds", "green"),
+                            (
+                                f"{sleep_time if not is_local_file else 'N/A'} seconds",
+                                "green",
+                            ),
                             "\n",
                             ("Pause: ", "cyan"),
                             (f"{pause if not is_local_file else 'N/A'}", "green"),
@@ -259,13 +262,18 @@ def main(
                     if is_local_file:
                         # Read local file
                         status.update("[bold cyan]Reading local file...")
-                        async with aio_open(url, 'r', encoding='utf-8') as file:
+                        async with aio_open(url, "rt", encoding="utf-8") as file:
                             markdown = await file.read()
+                        run_name = os.path.splitext(os.path.basename(url))[0].replace(
+                            "rawData_", ""
+                        )
                     else:
                         # Scrape data
                         status.update("[bold cyan]Fetching HTML...")
                         if scraper == ScraperChoice.PLAYWRIGHT:
-                            raw_html = await fetch_html_playwright(url, sleep_time, pause)
+                            raw_html = await fetch_html_playwright(
+                                url, sleep_time, pause
+                            )
                         else:
                             raw_html = await fetch_html_selenium(
                                 url, headless, sleep_time, pause
@@ -274,9 +282,9 @@ def main(
                         status.update("[bold cyan]Converting HTML to Markdown...")
                         markdown = await html_to_markdown_with_readability(raw_html)
 
-                    # Save raw data
-                    status.update("[bold cyan]Saving raw data...")
-                    await save_raw_data(markdown, run_name, output_folder)
+                        # Save raw data
+                        status.update("[bold cyan]Saving raw data...")
+                        await save_raw_data(markdown, run_name, output_folder)
 
                     # Create the dynamic listing model
                     status.update("[bold cyan]Creating dynamic models...")
@@ -290,6 +298,8 @@ def main(
                     formatted_data = await format_data(
                         markdown, dynamic_listings_container, model, ai_provider
                     )
+                    if not formatted_data:
+                        raise ValueError("No data was found by the scrape.")
 
                     # Save formatted data
                     status.update("[bold cyan]Saving formatted data...")
@@ -298,7 +308,7 @@ def main(
                     )
 
                     # Convert formatted_data back to text for token counting
-                    formatted_data_text = json.dumps(formatted_data.model_dump())
+                    formatted_data_text = json.dumps(formatted_data.dict())
 
                 # Display output if requested
                 if display_output:
