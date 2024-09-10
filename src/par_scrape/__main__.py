@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import List, Optional, Annotated
 from enum import Enum
 from uuid import uuid4
+from aiofiles import open as aio_open
 from contextlib import nullcontext
 from asyncio import run as aiorun
 import aiofiles
@@ -173,6 +174,10 @@ def main(
         CleanupType,
         typer.Option("--cleanup", "-c", help="How to handle cleanup of output folder."),
     ] = CleanupType.NONE,
+    extraction_prompt: Annotated[
+        Path,
+        typer.Option("--extraction-prompt", "-e", help="Path to the extraction prompt file"),
+    ] = Path("./extraction_prompt.md"),
 ):
     """Scrape and analyze data from a website."""
     if not model:
@@ -296,7 +301,7 @@ def main(
                     # Format data
                     status.update("[bold cyan]Formatting data...")
                     formatted_data = await format_data(
-                        markdown, dynamic_listings_container, model, ai_provider
+                        markdown, dynamic_listings_container, model, ai_provider, extraction_prompt
                     )
                     if not formatted_data:
                         raise ValueError("No data was found by the scrape.")
