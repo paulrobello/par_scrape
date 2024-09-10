@@ -3,7 +3,7 @@
 import json
 import os
 from pathlib import Path
-from typing import List, Type, Tuple, Dict
+from typing import List, Type, Tuple, Dict, Optional
 
 import aiofiles
 from aiofiles import open as aio_open
@@ -82,7 +82,7 @@ async def format_data(
     dynamic_listings_container: Type[BaseModel],
     model: str,
     ai_provider: LlmProvider,
-    extraction_prompt: Path,
+    extraction_prompt: Optional[Path] = None,
 ) -> BaseModel:
     """
     Format data using the specified AI provider's API asynchronously.
@@ -97,6 +97,8 @@ async def format_data(
     Returns:
         BaseModel: The formatted data as a Pydantic model instance.
     """
+    if not extraction_prompt:
+        extraction_prompt = Path(__file__).parent / "extraction_prompt.md"
     try:
         async with aio_open(extraction_prompt, "r") as file:
             system_message = await file.read()
@@ -104,13 +106,7 @@ async def format_data(
         console.print(
             f"[bold red]Extraction prompt file not found: {extraction_prompt}[/bold red]"
         )
-        system_message = """
-ROLE: You are an intelligent text extraction and conversion assistant.
-TASK: Extract structured information from the user provided text into the format required to call DynamicListingsContainer.
-If you encounter cases where you can't find the data for a specific field use an empty string "".
-You *MUST* call the `DynamicListingsContainer` function with the extracted data.
-"""
-        console.print("[yellow]Using default system message.[/yellow]")
+        raise
 
     user_message = f"Extract the following information from the provided text:\nPage content:\n\n{data}"
 

@@ -120,7 +120,7 @@ def main(
         typer.Option(
             "--sleep-time", "-t", help="Time to sleep before scrolling (in seconds)"
         ),
-    ] = 5,
+    ] = 3,
     pause: Annotated[
         bool,
         typer.Option(
@@ -174,11 +174,11 @@ def main(
         typer.Option("--cleanup", "-c", help="How to handle cleanup of output folder."),
     ] = CleanupType.NONE,
     extraction_prompt: Annotated[
-        Path,
+        Optional[Path],
         typer.Option(
             "--extraction-prompt", "-e", help="Path to the extraction prompt file"
         ),
-    ] = Path("./extraction_prompt.md"),
+    ] = None,
 ):
     """Scrape and analyze data from a website."""
     if not model:
@@ -352,7 +352,7 @@ def main(
                     )
 
             except Exception as e:  # pylint: disable=broad-except
-                print(e)
+                # print(e)
                 console.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
 
             finally:

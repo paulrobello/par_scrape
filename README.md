@@ -102,7 +102,7 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 - `--version`, `-v`: Show the version and exit
 - `--pricing`: Enable pricing summary display (default: False)
 - `--cleanup`, `-c`: How to handle cleanup of output folder (choices: none, before, after, both) (default: none)
-- `--extraction-prompt`, `-e`: Path to the extraction prompt file (default: "./extraction_prompt.md")
+- `--extraction-prompt`, `-e`: Path to alternate extraction prompt file
 
 ### Examples
 
@@ -133,9 +133,10 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 
 ## Whats New
 - Version 0.4.2:
-  - Remove need for ~/.par-scrape-config.json
   - The url parameter can now point to a local rawData_*.md file for easier testing of different models without having to re-fetch the data.
+  - Added ability to specify file with extraction prompt.
   - Tweaked extraction prompt to work with Groq and Anthropic. Google still does not work.
+  - Remove need for ~/.par-scrape-config.json-
 - Version 0.4.1:
   - Minor bug fixes for pricing summary.
   - Default model for google changed to "gemini-1.5-pro-exp-0827" which is free and usually works well.
