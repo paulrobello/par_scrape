@@ -1,13 +1,9 @@
 """Fetch HTML from URL and save it to a file."""
 
-import json
 import logging
 import os
 import asyncio
 import random
-from pathlib import Path
-
-import aiofiles
 
 import html2text
 from bs4 import BeautifulSoup
@@ -49,43 +45,11 @@ async def setup_selenium(headless: bool = True) -> WebDriver:
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"  # pylint: disable=line-too-long
     )
 
-    # Load ChromeDriver path from config.json
-    config_path = Path("~/.par-scrape.config.json").expanduser()
-    if config_path.exists():
-        async with aiofiles.open(config_path, "rt", encoding="utf-8") as config_file:
-            config = json.loads(await config_file.read())
-            chromedriver_path = config.get("chromedriver_path", "")
-    else:
-        chromedriver_path = ""
-
-    # Check if ChromeDriver exists, if not, download it
-    if not chromedriver_path or not os.path.exists(chromedriver_path):
-        console.print(
-            "[yellow]ChromeDriver not found or path invalid. Attempting to download...[/yellow]"
-        )
-        try:
-            chromedriver_path = await asyncio.to_thread(ChromeDriverManager().install)
-            console.print(
-                f"[green]ChromeDriver downloaded successfully to: {chromedriver_path}[/green]"
-            )
-
-            # Save the new path to config.json
-            async with aiofiles.open(
-                config_path, "wt", encoding="utf-8"
-            ) as config_file:
-                await config_file.write(
-                    json.dumps({"chromedriver_path": chromedriver_path}, indent=4)
-                )
-            console.print("[green]Updated ChromeDriver path in config.json[/green]")
-        except Exception as e:
-            console.print(
-                f"[bold red]Error downloading ChromeDriver:[/bold red] {str(e)}"
-            )
-            raise
-
-    service = Service(chromedriver_path, log_output=os.devnull)
-
     try:
+        chromedriver_path = await asyncio.to_thread(ChromeDriverManager().install)
+
+        service = Service(chromedriver_path, log_output=os.devnull)
+
         # Initialize the WebDriver
         driver = await asyncio.to_thread(
             webdriver.Chrome, service=service, options=options

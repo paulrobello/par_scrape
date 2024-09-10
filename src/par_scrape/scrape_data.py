@@ -3,12 +3,14 @@
 import json
 import os
 from pathlib import Path
-from typing import List, Type, Tuple, Dict
+from typing import List, Type, Tuple, Dict, Optional
 
 import aiofiles
-import pandas as pd
+from aiofiles import open as aio_open
 from aiofiles import os as aos
-from pydantic import BaseModel, create_model, ConfigDict
+
+import pandas as pd
+from langchain_core.pydantic_v1 import BaseModel, create_model, ConfigDict
 from rich.panel import Panel
 
 from par_scrape.utils import console
@@ -80,6 +82,7 @@ async def format_data(
     dynamic_listings_container: Type[BaseModel],
     model: str,
     ai_provider: LlmProvider,
+    extraction_prompt: Optional[Path] = None,
 ) -> BaseModel:
     """
     Format data using the specified AI provider's API asynchronously.
@@ -89,22 +92,28 @@ async def format_data(
         dynamic_listings_container (Type[BaseModel]): The Pydantic model to use for parsing.
         model (str): The AI model to use for processing.
         ai_provider (LlmProvider): The AI provider to use for processing.
+        extraction_prompt (Path): Path to the extraction prompt file.
 
     Returns:
         BaseModel: The formatted data as a Pydantic model instance.
     """
-    system_message = """
-You are an intelligent text extraction and conversion assistant. Your task is to extract structured information
-from the given text and convert it into a pure JSON format. The JSON should contain only the structured data extracted from the text,
-with no additional commentary, explanations, or extraneous information.
-You could encounter cases where you can't find the data of the fields you have to extract or the data will be in a foreign language.
-Please process the following text and provide the output in pure JSON format with no words before or after the JSON:
-Make sure to call the DynamicListingsContainer function with the extracted data."""
+    if not extraction_prompt:
+        extraction_prompt = Path(__file__).parent / "extraction_prompt.md"
+    try:
+        async with aio_open(extraction_prompt, "r") as file:
+            system_message = await file.read()
+    except FileNotFoundError:
+        console.print(
+            f"[bold red]Extraction prompt file not found: {extraction_prompt}[/bold red]"
+        )
+        raise
+
     user_message = f"Extract the following information from the provided text:\nPage content:\n\n{data}"
 
     try:
         llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0)
         chat_model = llm_config.build_chat_model()
+
         structure_model = chat_model.with_structured_output(
             dynamic_listings_container  # , include_raw=True
         )
@@ -145,7 +154,7 @@ async def save_formatted_data(
     await aos.makedirs(output_folder, exist_ok=True)
 
     # Prepare formatted data as a dictionary
-    formatted_data_dict = formatted_data.model_dump()
+    formatted_data_dict = formatted_data.dict()
 
     # Save the formatted data as JSON with run_name in filename
     json_output_path = os.path.join(output_folder, f"sorted_data_{run_name}.json")

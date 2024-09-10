@@ -24,7 +24,7 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 
 ## Known Issues
 - Silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
-- Providers other than OpenAI have not been tested you millage may vary
+- Providers other than OpenAI are hit-and-miss depending on provider / model / data being extracted.
 
 ## Installation
 
@@ -63,16 +63,16 @@ Ensure you have the AI provider api key in your environment.
 The key names for supported providers are as follows:
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
-- Google: `GOOGLE_API_KEY`
 - Groq: `GROQ_API_KEY`
+- Google: `GOOGLE_API_KEY`
 - Ollama: `Not needed`
 
 You can also store your key in the file `~/.par-scrape.env` as follows:
 ```
 OPENAI_API_KEY=your_api_key
 ANTHROPIC_API_KEY=your_api_key
-GOOGLE_API_KEY=your_api_key
 GROQ_API_KEY=your_api_key
+GOOGLE_API_KEY=your_api_key
 ```
 
 ### Running from source
@@ -87,21 +87,22 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 
 ### Options
 
-- `--url`, `-u`: The URL to scrape (default: "https://openai.com/api/pricing/")
+- `--url`, `-u`: The URL to scrape or path to a local file (default: "https://openai.com/api/pricing/")
 - `--fields`, `-f`: Fields to extract from the webpage (default: ["Model", "Pricing Input", "Pricing Output"])
-- `--scraper`: Scraper to use: 'selenium' or 'playwright' (default: "selenium")
+- `--scraper`, `-s`: Scraper to use: 'selenium' or 'playwright' (default: "selenium")
 - `--headless`, `-h`: Run in headless mode (for Selenium) (default: False)
 - `--sleep-time`, `-t`: Time to sleep (in seconds) before scrolling and closing browser (default: 5)
-- `--pause`, `-p`: Wait for user input before closing browser
+- `--pause`, `-p`: Wait for user input before closing browser (default: False)
 - `--ai-provider`, `-a`: AI provider to use for processing (default: "OpenAI")
 - `--model`, `-m`: AI model to use for processing. If not specified, a default model will be used based on the provider.
-- `--pricing`: Enable pricing summary display (default: False)
 - `--display-output`, `-d`: Display output in terminal (md, csv, or json)
 - `--output-folder`, `-o`: Specify the location of the output folder (default: "./output")
-- `--silent`, `-s`: Run in silent mode, suppressing output
+- `--silent`, `-q`: Run in silent mode, suppressing output (default: False)
 - `--run-name`, `-n`: Specify a name for this run
 - `--version`, `-v`: Show the version and exit
-- `--cleanup`, `-c`: [none|before|after|both] If and when to remove the output folder (default: none)
+- `--pricing`: Enable pricing summary display (default: False)
+- `--cleanup`, `-c`: How to handle cleanup of output folder (choices: none, before, after, both) (default: none)
+- `--extraction-prompt`, `-e`: Path to alternate extraction prompt file
 
 ### Examples
 
@@ -131,6 +132,11 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```
 
 ## Whats New
+- Version 0.4.2:
+  - The url parameter can now point to a local rawData_*.md file for easier testing of different models without having to re-fetch the data.
+  - Added ability to specify file with extraction prompt.
+  - Tweaked extraction prompt to work with Groq and Anthropic. Google still does not work.
+  - Remove need for ~/.par-scrape-config.json-
 - Version 0.4.1:
   - Minor bug fixes for pricing summary.
   - Default model for google changed to "gemini-1.5-pro-exp-0827" which is free and usually works well.

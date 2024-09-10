@@ -15,6 +15,7 @@ from contextlib import nullcontext
 from asyncio import run as aiorun
 import aiofiles
 import aiofiles.os as aos
+from aiofiles import open as aio_open
 
 import typer
 from dotenv import load_dotenv
@@ -119,7 +120,7 @@ def main(
         typer.Option(
             "--sleep-time", "-t", help="Time to sleep before scrolling (in seconds)"
         ),
-    ] = 5,
+    ] = 3,
     pause: Annotated[
         bool,
         typer.Option(
@@ -172,13 +173,19 @@ def main(
         CleanupType,
         typer.Option("--cleanup", "-c", help="How to handle cleanup of output folder."),
     ] = CleanupType.NONE,
+    extraction_prompt: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--extraction-prompt", "-e", help="Path to the extraction prompt file"
+        ),
+    ] = None,
 ):
     """Scrape and analyze data from a website."""
     if not model:
         model = provider_default_models[ai_provider]
 
     async def _main():  # pylint: disable=too-many-locals, too-many-branches, too-many-statements
-        """Scrape and analyze data from a website."""
+        """Scrape and analyze data from a website or local file."""
         nonlocal run_name
         if ai_provider != LlmProvider.OLLAMA:
             key_name = provider_env_key_names[ai_provider]
@@ -206,11 +213,15 @@ def main(
                     if not run_name:
                         run_name = str(uuid4())
 
+                # Check if url is a local file
+                is_local_file = await aos.path.isfile(url)
+                source_type = "Local File" if is_local_file else "URL"
+
                 # Display summary of options
                 console.print(
                     Panel.fit(
                         Text.assemble(
-                            ("URL: ", "cyan"),
+                            (f"{source_type}: ", "cyan"),
                             (f"{url}", "green"),
                             "\n",
                             ("AI Provider: ", "cyan"),
@@ -220,16 +231,19 @@ def main(
                             (f"{model}", "green"),
                             "\n",
                             ("Scraper: ", "cyan"),
-                            (f"{scraper}", "green"),
+                            (f"{scraper if not is_local_file else 'N/A'}", "green"),
                             "\n",
                             ("Headless: ", "cyan"),
-                            (f"{headless}", "green"),
+                            (f"{headless if not is_local_file else 'N/A'}", "green"),
                             "\n",
                             ("Sleep Time: ", "cyan"),
-                            (f"{sleep_time} seconds", "green"),
+                            (
+                                f"{sleep_time if not is_local_file else 'N/A'} seconds",
+                                "green",
+                            ),
                             "\n",
                             ("Pause: ", "cyan"),
-                            (f"{pause}", "green"),
+                            (f"{pause if not is_local_file else 'N/A'}", "green"),
                             "\n",
                             ("Fields to extract: ", "cyan"),
                             (", ".join(fields), "green"),
@@ -251,21 +265,32 @@ def main(
                 with console.status(
                     "[bold green]Working on data extraction and processing..."
                 ) as status:
-                    # Scrape data
-                    status.update("[bold cyan]Fetching HTML...")
-                    if scraper == ScraperChoice.PLAYWRIGHT:
-                        raw_html = await fetch_html_playwright(url, sleep_time, pause)
-                    else:
-                        raw_html = await fetch_html_selenium(
-                            url, headless, sleep_time, pause
+                    if is_local_file:
+                        # Read local file
+                        status.update("[bold cyan]Reading local file...")
+                        async with aio_open(url, "rt", encoding="utf-8") as file:
+                            markdown = await file.read()
+                        run_name = os.path.splitext(os.path.basename(url))[0].replace(
+                            "rawData_", ""
                         )
+                    else:
+                        # Scrape data
+                        status.update("[bold cyan]Fetching HTML...")
+                        if scraper == ScraperChoice.PLAYWRIGHT:
+                            raw_html = await fetch_html_playwright(
+                                url, sleep_time, pause
+                            )
+                        else:
+                            raw_html = await fetch_html_selenium(
+                                url, headless, sleep_time, pause
+                            )
 
-                    status.update("[bold cyan]Converting HTML to Markdown...")
-                    markdown = await html_to_markdown_with_readability(raw_html)
+                        status.update("[bold cyan]Converting HTML to Markdown...")
+                        markdown = await html_to_markdown_with_readability(raw_html)
 
-                    # Save raw data
-                    status.update("[bold cyan]Saving raw data...")
-                    await save_raw_data(markdown, run_name, output_folder)
+                        # Save raw data
+                        status.update("[bold cyan]Saving raw data...")
+                        await save_raw_data(markdown, run_name, output_folder)
 
                     # Create the dynamic listing model
                     status.update("[bold cyan]Creating dynamic models...")
@@ -277,8 +302,14 @@ def main(
                     # Format data
                     status.update("[bold cyan]Formatting data...")
                     formatted_data = await format_data(
-                        markdown, dynamic_listings_container, model, ai_provider
+                        markdown,
+                        dynamic_listings_container,
+                        model,
+                        ai_provider,
+                        extraction_prompt,
                     )
+                    if not formatted_data:
+                        raise ValueError("No data was found by the scrape.")
 
                     # Save formatted data
                     status.update("[bold cyan]Saving formatted data...")
@@ -287,7 +318,7 @@ def main(
                     )
 
                     # Convert formatted_data back to text for token counting
-                    formatted_data_text = json.dumps(formatted_data.model_dump())
+                    formatted_data_text = json.dumps(formatted_data.dict())
 
                 # Display output if requested
                 if display_output:
@@ -321,7 +352,7 @@ def main(
                     )
 
             except Exception as e:  # pylint: disable=broad-except
-                print(e)
+                # print(e)
                 console.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
 
             finally:

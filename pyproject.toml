@@ -104,6 +104,7 @@ include = [
     "src/par_scrape",
     "LICENSE",
     "README.md",
+    "extraction_prompt.md",
     "pyproject.toml"
 ]
 exclude = [
