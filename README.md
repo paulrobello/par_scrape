@@ -87,21 +87,22 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 
 ### Options
 
-- `--url`, `-u`: The URL to scrape (default: "https://openai.com/api/pricing/")
+- `--url`, `-u`: The URL to scrape or path to a local file (default: "https://openai.com/api/pricing/")
 - `--fields`, `-f`: Fields to extract from the webpage (default: ["Model", "Pricing Input", "Pricing Output"])
-- `--scraper`: Scraper to use: 'selenium' or 'playwright' (default: "selenium")
+- `--scraper`, `-s`: Scraper to use: 'selenium' or 'playwright' (default: "selenium")
 - `--headless`, `-h`: Run in headless mode (for Selenium) (default: False)
 - `--sleep-time`, `-t`: Time to sleep (in seconds) before scrolling and closing browser (default: 5)
-- `--pause`, `-p`: Wait for user input before closing browser
+- `--pause`, `-p`: Wait for user input before closing browser (default: False)
 - `--ai-provider`, `-a`: AI provider to use for processing (default: "OpenAI")
 - `--model`, `-m`: AI model to use for processing. If not specified, a default model will be used based on the provider.
-- `--pricing`: Enable pricing summary display (default: False)
 - `--display-output`, `-d`: Display output in terminal (md, csv, or json)
 - `--output-folder`, `-o`: Specify the location of the output folder (default: "./output")
-- `--silent`, `-s`: Run in silent mode, suppressing output
+- `--silent`, `-q`: Run in silent mode, suppressing output (default: False)
 - `--run-name`, `-n`: Specify a name for this run
 - `--version`, `-v`: Show the version and exit
-- `--cleanup`, `-c`: [none|before|after|both] If and when to remove the output folder (default: none)
+- `--pricing`: Enable pricing summary display (default: False)
+- `--cleanup`, `-c`: How to handle cleanup of output folder (choices: none, before, after, both) (default: none)
+- `--extraction-prompt`, `-e`: Path to the extraction prompt file (default: "./extraction_prompt.md")
 
 ### Examples
 
