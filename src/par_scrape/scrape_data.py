@@ -6,8 +6,10 @@ from pathlib import Path
 from typing import List, Type, Tuple, Dict
 
 import aiofiles
-import pandas as pd
+from aiofiles import open as aio_open
 from aiofiles import os as aos
+
+import pandas as pd
 from langchain_core.pydantic_v1 import BaseModel, create_model, ConfigDict
 from rich.panel import Panel
 
@@ -96,12 +98,14 @@ async def format_data(
         BaseModel: The formatted data as a Pydantic model instance.
     """
     try:
-        async with aio_open(extraction_prompt, 'r') as file:
+        async with aio_open(extraction_prompt, "r") as file:
             system_message = await file.read()
     except FileNotFoundError:
-        console.print(f"[bold red]Extraction prompt file not found: {extraction_prompt}[/bold red]")
+        console.print(
+            f"[bold red]Extraction prompt file not found: {extraction_prompt}[/bold red]"
+        )
         system_message = """
-ROLE: You are an intelligent text extraction and conversion assistant. 
+ROLE: You are an intelligent text extraction and conversion assistant.
 TASK: Extract structured information from the user provided text into the format required to call DynamicListingsContainer.
 If you encounter cases where you can't find the data for a specific field use an empty string "".
 You *MUST* call the `DynamicListingsContainer` function with the extracted data.

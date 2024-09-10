@@ -63,16 +63,16 @@ Ensure you have the AI provider api key in your environment.
 The key names for supported providers are as follows:
 - OpenAI: `OPENAI_API_KEY`
 - Anthropic: `ANTHROPIC_API_KEY`
-- Google: `GOOGLE_API_KEY`
 - Groq: `GROQ_API_KEY`
+- Google: `GOOGLE_API_KEY`
 - Ollama: `Not needed`
 
 You can also store your key in the file `~/.par-scrape.env` as follows:
 ```
 OPENAI_API_KEY=your_api_key
 ANTHROPIC_API_KEY=your_api_key
-GOOGLE_API_KEY=your_api_key
 GROQ_API_KEY=your_api_key
+GOOGLE_API_KEY=your_api_key
 ```
 
 ### Running from source
@@ -131,6 +131,10 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```
 
 ## Whats New
+- Version 0.4.2:
+  - Remove need for ~/.par-scrape-config.json
+  - The url parameter can now point to a local rawData_*.md file for easier testing of different models without having to re-fetch the data.
+  - Tweaked extraction prompt to work with Groq and Anthropic. Google still does not work.
 - Version 0.4.1:
   - Minor bug fixes for pricing summary.
   - Default model for google changed to "gemini-1.5-pro-exp-0827" which is free and usually works well.
