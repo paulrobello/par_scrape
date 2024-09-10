@@ -15,6 +15,7 @@ from contextlib import nullcontext
 from asyncio import run as aiorun
 import aiofiles
 import aiofiles.os as aos
+from aiofiles import open as aio_open
 
 import typer
 from dotenv import load_dotenv
@@ -178,7 +179,7 @@ def main(
         model = provider_default_models[ai_provider]
 
     async def _main():  # pylint: disable=too-many-locals, too-many-branches, too-many-statements
-        """Scrape and analyze data from a website."""
+        """Scrape and analyze data from a website or local file."""
         nonlocal run_name
         if ai_provider != LlmProvider.OLLAMA:
             key_name = provider_env_key_names[ai_provider]
@@ -206,11 +207,15 @@ def main(
                     if not run_name:
                         run_name = str(uuid4())
 
+                # Check if url is a local file
+                is_local_file = await aos.path.isfile(url)
+                source_type = "Local File" if is_local_file else "URL"
+
                 # Display summary of options
                 console.print(
                     Panel.fit(
                         Text.assemble(
-                            ("URL: ", "cyan"),
+                            (f"{source_type}: ", "cyan"),
                             (f"{url}", "green"),
                             "\n",
                             ("AI Provider: ", "cyan"),
@@ -220,16 +225,16 @@ def main(
                             (f"{model}", "green"),
                             "\n",
                             ("Scraper: ", "cyan"),
-                            (f"{scraper}", "green"),
+                            (f"{scraper if not is_local_file else 'N/A'}", "green"),
                             "\n",
                             ("Headless: ", "cyan"),
-                            (f"{headless}", "green"),
+                            (f"{headless if not is_local_file else 'N/A'}", "green"),
                             "\n",
                             ("Sleep Time: ", "cyan"),
-                            (f"{sleep_time} seconds", "green"),
+                            (f"{sleep_time if not is_local_file else 'N/A'} seconds", "green"),
                             "\n",
                             ("Pause: ", "cyan"),
-                            (f"{pause}", "green"),
+                            (f"{pause if not is_local_file else 'N/A'}", "green"),
                             "\n",
                             ("Fields to extract: ", "cyan"),
                             (", ".join(fields), "green"),
@@ -251,17 +256,23 @@ def main(
                 with console.status(
                     "[bold green]Working on data extraction and processing..."
                 ) as status:
-                    # Scrape data
-                    status.update("[bold cyan]Fetching HTML...")
-                    if scraper == ScraperChoice.PLAYWRIGHT:
-                        raw_html = await fetch_html_playwright(url, sleep_time, pause)
+                    if is_local_file:
+                        # Read local file
+                        status.update("[bold cyan]Reading local file...")
+                        async with aio_open(url, 'r', encoding='utf-8') as file:
+                            markdown = await file.read()
                     else:
-                        raw_html = await fetch_html_selenium(
-                            url, headless, sleep_time, pause
-                        )
+                        # Scrape data
+                        status.update("[bold cyan]Fetching HTML...")
+                        if scraper == ScraperChoice.PLAYWRIGHT:
+                            raw_html = await fetch_html_playwright(url, sleep_time, pause)
+                        else:
+                            raw_html = await fetch_html_selenium(
+                                url, headless, sleep_time, pause
+                            )
 
-                    status.update("[bold cyan]Converting HTML to Markdown...")
-                    markdown = await html_to_markdown_with_readability(raw_html)
+                        status.update("[bold cyan]Converting HTML to Markdown...")
+                        markdown = await html_to_markdown_with_readability(raw_html)
 
                     # Save raw data
                     status.update("[bold cyan]Saving raw data...")
