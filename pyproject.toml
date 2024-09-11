@@ -23,7 +23,6 @@ classifiers = [
 ]
 keywords = ["web scraping", "selenium", "playwright", "openai", "data extraction"]
 dependencies = [
-
     "aiofiles>=24.1.0",
     "beautifulsoup4>=4.12.3",
     "html2text>=2024.2.26",
