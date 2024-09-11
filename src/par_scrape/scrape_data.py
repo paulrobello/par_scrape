@@ -83,6 +83,7 @@ async def format_data(
     model: str,
     ai_provider: LlmProvider,
     extraction_prompt: Optional[Path] = None,
+    ai_base_url: Optional[str] = None,
 ) -> BaseModel:
     """
     Format data using the specified AI provider's API asynchronously.
@@ -93,6 +94,7 @@ async def format_data(
         model (str): The AI model to use for processing.
         ai_provider (LlmProvider): The AI provider to use for processing.
         extraction_prompt (Path): Path to the extraction prompt file.
+        ai_base_url (str): The base URL for the AI provider.
 
     Returns:
         BaseModel: The formatted data as a Pydantic model instance.
@@ -111,7 +113,9 @@ async def format_data(
     user_message = f"Extract the following information from the provided text:\nPage content:\n\n{data}"
 
     try:
-        llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0)
+        llm_config = LlmConfig(
+            provider=ai_provider, model_name=model, temperature=0, base_url=ai_base_url
+        )
         chat_model = llm_config.build_chat_model()
 
         structure_model = chat_model.with_structured_output(

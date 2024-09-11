@@ -19,6 +19,7 @@ from aiofiles import open as aio_open
 
 import typer
 from dotenv import load_dotenv
+from openai import base_url
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -139,6 +140,14 @@ def main(
             help="AI model to use for processing. If not specified, a default model will be used.",
         ),
     ] = None,
+    ai_base_url: Annotated[
+        Optional[str],
+        typer.Option(
+            "--ai-base-url",
+            "-b",
+            help="Override the base URL for the AI provider.",
+        ),
+    ] = None,
     display_output: Annotated[
         Optional[DisplayOutputFormat],
         typer.Option(
@@ -230,6 +239,9 @@ def main(
                             ("Model: ", "cyan"),
                             (f"{model}", "green"),
                             "\n",
+                            ("AI Provider Base URL: ", "cyan"),
+                            (f"{base_url or 'default'}", "green"),
+                            "\n",
                             ("Scraper: ", "cyan"),
                             (f"{scraper if not is_local_file else 'N/A'}", "green"),
                             "\n",
@@ -307,6 +319,7 @@ def main(
                         model,
                         ai_provider,
                         extraction_prompt,
+                        ai_base_url,
                     )
                     if not formatted_data:
                         raise ValueError("No data was found by the scrape.")

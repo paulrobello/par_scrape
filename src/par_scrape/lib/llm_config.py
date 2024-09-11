@@ -6,6 +6,7 @@ import os
 import warnings
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 from langchain._api import LangChainDeprecationWarning
 from langchain_anthropic import ChatAnthropic
@@ -51,6 +52,8 @@ class LlmConfig:
     mode: LlmMode = LlmMode.CHAT
     temperature: float = 0.5
     streaming: bool = False
+    base_url: Optional[str] = None
+    class_name: str = "LlmConfig"
 
     def to_json(self) -> dict:
         """Return dict for use with json"""
@@ -60,6 +63,8 @@ class LlmConfig:
             "model_name": self.model_name,
             "mode": self.mode,
             "temperature": self.temperature,
+            "streaming": self.streaming,
+            "base_url": self.base_url,
         }
 
     @staticmethod
@@ -77,6 +82,8 @@ class LlmConfig:
             model_name=self.model_name,
             mode=self.mode,
             temperature=self.temperature,
+            streaming=self.streaming,
+            base_url=self.base_url,
         )
 
     # pylint: disable=too-many-return-statements,too-many-branches
@@ -87,17 +94,17 @@ class LlmConfig:
                 return Ollama(
                     model=self.model_name,
                     temperature=self.temperature,
-                    base_url=ollama_host,
+                    base_url=self.base_url or ollama_host,
                 )
             if self.mode == LlmMode.CHAT:
                 return ChatOllama(
                     model=self.model_name,
                     temperature=self.temperature,
-                    base_url=ollama_host,
+                    base_url=self.base_url or ollama_host,
                 )
             if self.mode == LlmMode.EMBEDDINGS:
                 return ParOllamaEmbeddings(
-                    ollama_host=ollama_host, model=self.model_name
+                    ollama_host=self.base_url or ollama_host, model=self.model_name
                 )
         elif self.provider == LlmProvider.OPENAI:
             if self.mode == LlmMode.BASE:
@@ -105,12 +112,14 @@ class LlmConfig:
                     model=self.model_name,
                     temperature=self.temperature,
                     streaming=self.streaming,
+                    base_url=self.base_url,
                 )
             if self.mode == LlmMode.CHAT:
                 return ChatOpenAI(
                     model=self.model_name,
                     temperature=self.temperature,
                     streaming=self.streaming,
+                    base_url=self.base_url,
                 )
             if self.mode == LlmMode.EMBEDDINGS:
                 return OpenAIEmbeddings(model=self.model_name)
@@ -124,6 +133,7 @@ class LlmConfig:
                     model=self.model_name,
                     temperature=self.temperature,
                     streaming=self.streaming,
+                    base_url=self.base_url,
                 )  # pyright: ignore [reportCallIssue]
             if self.mode == LlmMode.EMBEDDINGS:
                 raise ValueError(
@@ -140,6 +150,7 @@ class LlmConfig:
                     temperature=self.temperature,
                     streaming=self.streaming,
                     default_headers={"anthropic-beta": "tools-2024-05-16"},
+                    base_url=self.base_url,
                     # max_tokens=8_192,
                 )
             if self.mode == LlmMode.EMBEDDINGS:
