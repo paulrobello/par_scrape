@@ -51,6 +51,7 @@ dependencies = [
     "typer>=0.12.5",
     "typing-extensions>=4.12.2",
     "webdriver-manager>=4.0.2",
+    "markdownify>=0.13.1",
 ]
 
 packages = [
