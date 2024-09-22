@@ -139,6 +139,7 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```
 
 ## Whats New
+
 - Version 0.4.4:
   - Better Playwright scraping.
 - Version 0.4.3:

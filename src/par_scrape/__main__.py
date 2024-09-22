@@ -287,7 +287,6 @@ def main(
 
                     status.update("[bold cyan]Converting HTML to Markdown...")
                     markdown = html_to_markdown_with_readability(raw_html)
-
                     # Save raw data
                     status.update("[bold cyan]Saving raw data...")
                     save_raw_data(markdown, run_name, output_folder)
