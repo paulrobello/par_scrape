@@ -4,7 +4,6 @@ import csv
 import json
 import os
 import shutil
-import asyncio
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
@@ -12,10 +11,6 @@ from typing import List, Optional, Annotated
 from enum import Enum
 from uuid import uuid4
 from contextlib import nullcontext
-from asyncio import run as aiorun
-import aiofiles
-import aiofiles.os as aos
-from aiofiles import open as aio_open
 
 import typer
 from dotenv import load_dotenv
@@ -87,7 +82,7 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-# pylint: disable=too-many-statements,dangerous-default-value,too-many-arguments, too-many-locals
+# pylint: disable=too-many-statements,dangerous-default-value,too-many-arguments, too-many-locals, too-many-positional-arguments, too-many-branches
 @app.command()
 def main(
     url: Annotated[
@@ -193,191 +188,179 @@ def main(
     if not model:
         model = provider_default_models[ai_provider]
 
-    async def _main():  # pylint: disable=too-many-locals, too-many-branches, too-many-statements
-        """Scrape and analyze data from a website or local file."""
-        nonlocal run_name
-        if ai_provider != LlmProvider.OLLAMA:
-            key_name = provider_env_key_names[ai_provider]
-            if not os.environ.get(key_name):
+    if ai_provider != LlmProvider.OLLAMA:
+        key_name = provider_env_key_names[ai_provider]
+        if not os.environ.get(key_name):
+            console.print(
+                f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]"
+            )
+            raise typer.Exit(1)
+    with console.capture() if silent else nullcontext():
+        if cleanup in [CleanupType.BEFORE, CleanupType.BOTH]:
+            if os.path.exists(output_folder):
+                shutil.rmtree(output_folder)
                 console.print(
-                    f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]"
+                    f"[bold green]Removed existing output folder: {output_folder}[/bold green]"
                 )
-                raise typer.Exit(1)
-        with console.capture() if silent else nullcontext():
-            if cleanup in [CleanupType.BEFORE, CleanupType.BOTH]:
-                if await aos.path.exists(output_folder):
-                    shutil.rmtree(output_folder)
-                    console.print(
-                        f"[bold green]Removed existing output folder: {output_folder}[/bold green]"
-                    )
-            try:
-                # Generate run_name if not provided
+        try:
+            # Generate run_name if not provided
+            if not run_name:
+                run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+            else:
+                # Ensure run_name is filesystem-friendly
+                run_name = "".join(
+                    c for c in run_name if c.isalnum() or c in ("-", "_")
+                )
                 if not run_name:
-                    run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-                else:
-                    # Ensure run_name is filesystem-friendly
-                    run_name = "".join(
-                        c for c in run_name if c.isalnum() or c in ("-", "_")
-                    )
-                    if not run_name:
-                        run_name = str(uuid4())
+                    run_name = str(uuid4())
 
-                # Check if url is a local file
-                is_local_file = await aos.path.isfile(url)
-                source_type = "Local File" if is_local_file else "URL"
+            # Check if url is a local file
+            is_local_file = os.path.isfile(url)
+            source_type = "Local File" if is_local_file else "URL"
 
-                # Display summary of options
-                console.print(
-                    Panel.fit(
-                        Text.assemble(
-                            (f"{source_type}: ", "cyan"),
-                            (f"{url}", "green"),
-                            "\n",
-                            ("AI Provider: ", "cyan"),
-                            (f"{ai_provider.value}", "green"),
-                            "\n",
-                            ("Model: ", "cyan"),
-                            (f"{model}", "green"),
-                            "\n",
-                            ("AI Provider Base URL: ", "cyan"),
-                            (f"{base_url or 'default'}", "green"),
-                            "\n",
-                            ("Scraper: ", "cyan"),
-                            (f"{scraper if not is_local_file else 'N/A'}", "green"),
-                            "\n",
-                            ("Headless: ", "cyan"),
-                            (f"{headless if not is_local_file else 'N/A'}", "green"),
-                            "\n",
-                            ("Sleep Time: ", "cyan"),
-                            (
-                                f"{sleep_time if not is_local_file else 'N/A'} seconds",
-                                "green",
-                            ),
-                            "\n",
-                            ("Pause: ", "cyan"),
-                            (f"{pause if not is_local_file else 'N/A'}", "green"),
-                            "\n",
-                            ("Fields to extract: ", "cyan"),
-                            (", ".join(fields), "green"),
-                            "\n",
-                            ("Display output: ", "cyan"),
-                            (f"{display_output or 'None'}", "green"),
-                            "\n",
-                            ("Silent mode: ", "cyan"),
-                            (f"{silent}", "green"),
-                            "\n",
-                            ("Cleanup: ", "cyan"),
-                            (f"{cleanup}", "green"),
+            # Display summary of options
+            console.print(
+                Panel.fit(
+                    Text.assemble(
+                        (f"{source_type}: ", "cyan"),
+                        (f"{url}", "green"),
+                        "\n",
+                        ("AI Provider: ", "cyan"),
+                        (f"{ai_provider.value}", "green"),
+                        "\n",
+                        ("Model: ", "cyan"),
+                        (f"{model}", "green"),
+                        "\n",
+                        ("AI Provider Base URL: ", "cyan"),
+                        (f"{base_url or 'default'}", "green"),
+                        "\n",
+                        ("Scraper: ", "cyan"),
+                        (f"{scraper if not is_local_file else 'N/A'}", "green"),
+                        "\n",
+                        ("Headless: ", "cyan"),
+                        (f"{headless if not is_local_file else 'N/A'}", "green"),
+                        "\n",
+                        ("Sleep Time: ", "cyan"),
+                        (
+                            f"{sleep_time if not is_local_file else 'N/A'} seconds",
+                            "green",
                         ),
-                        title="[bold]Scraping Configuration",
-                        border_style="bold",
+                        "\n",
+                        ("Pause: ", "cyan"),
+                        (f"{pause if not is_local_file else 'N/A'}", "green"),
+                        "\n",
+                        ("Fields to extract: ", "cyan"),
+                        (", ".join(fields), "green"),
+                        "\n",
+                        ("Display output: ", "cyan"),
+                        (f"{display_output or 'None'}", "green"),
+                        "\n",
+                        ("Silent mode: ", "cyan"),
+                        (f"{silent}", "green"),
+                        "\n",
+                        ("Cleanup: ", "cyan"),
+                        (f"{cleanup}", "green"),
+                    ),
+                    title="[bold]Scraping Configuration",
+                    border_style="bold",
+                )
+            )
+
+            with console.status(
+                "[bold green]Working on data extraction and processing..."
+            ) as status:
+                if is_local_file:
+                    # Read local file
+                    status.update("[bold cyan]Reading local file...")
+                    with open(url, "rt", encoding="utf-8") as file:
+                        markdown = file.read()
+                    run_name = os.path.splitext(os.path.basename(url))[0].replace(
+                        "rawData_", ""
                     )
+                else:
+                    # Scrape data
+                    status.update("[bold cyan]Fetching HTML...")
+                    if scraper == ScraperChoice.PLAYWRIGHT:
+                        raw_html = fetch_html_playwright(url, sleep_time, pause)
+                    else:
+                        raw_html = fetch_html_selenium(url, headless, sleep_time, pause)
+
+                    status.update("[bold cyan]Converting HTML to Markdown...")
+                    markdown = html_to_markdown_with_readability(raw_html)
+                    # Save raw data
+                    status.update("[bold cyan]Saving raw data...")
+                    save_raw_data(markdown, run_name, output_folder)
+
+                # Create the dynamic listing model
+                status.update("[bold cyan]Creating dynamic models...")
+                dynamic_listing_model = create_dynamic_listing_model(fields)
+                dynamic_listings_container = create_listings_container_model(
+                    dynamic_listing_model
                 )
 
-                with console.status(
-                    "[bold green]Working on data extraction and processing..."
-                ) as status:
-                    if is_local_file:
-                        # Read local file
-                        status.update("[bold cyan]Reading local file...")
-                        async with aio_open(url, "rt", encoding="utf-8") as file:
-                            markdown = await file.read()
-                        run_name = os.path.splitext(os.path.basename(url))[0].replace(
-                            "rawData_", ""
-                        )
-                    else:
-                        # Scrape data
-                        status.update("[bold cyan]Fetching HTML...")
-                        if scraper == ScraperChoice.PLAYWRIGHT:
-                            raw_html = await fetch_html_playwright(
-                                url, sleep_time, pause
-                            )
-                        else:
-                            raw_html = await fetch_html_selenium(
-                                url, headless, sleep_time, pause
-                            )
+                # Format data
+                status.update("[bold cyan]Formatting data...")
+                formatted_data = format_data(
+                    markdown,
+                    dynamic_listings_container,
+                    model,
+                    ai_provider,
+                    extraction_prompt,
+                    ai_base_url,
+                )
+                if not formatted_data:
+                    raise ValueError("No data was found by the scrape.")
 
-                        status.update("[bold cyan]Converting HTML to Markdown...")
-                        markdown = await html_to_markdown_with_readability(raw_html)
+                # Save formatted data
+                status.update("[bold cyan]Saving formatted data...")
+                _, file_paths = save_formatted_data(
+                    formatted_data, run_name, output_folder
+                )
 
-                        # Save raw data
-                        status.update("[bold cyan]Saving raw data...")
-                        await save_raw_data(markdown, run_name, output_folder)
+                # Convert formatted_data back to text for token counting
+                formatted_data_text = json.dumps(formatted_data.dict())
 
-                    # Create the dynamic listing model
-                    status.update("[bold cyan]Creating dynamic models...")
-                    dynamic_listing_model = create_dynamic_listing_model(fields)
-                    dynamic_listings_container = create_listings_container_model(
-                        dynamic_listing_model
+            # Display output if requested
+            if display_output:
+                if display_output.value in file_paths:
+                    with open(
+                        file_paths[display_output.value], "rt", encoding="utf-8"
+                    ) as f:
+                        content = f.read()
+                    if display_output == DisplayOutputFormat.MD:
+                        console.print(Markdown(content))
+                    elif display_output == DisplayOutputFormat.CSV:
+                        # Convert CSV to rich Table
+                        table = Table(title="CSV Data")
+                        csv_reader = csv.reader(StringIO(content))
+                        headers = next(csv_reader)
+                        for header in headers:
+                            table.add_column(header, style="cyan")
+                        for row in csv_reader:
+                            table.add_row(*row)
+                        console.print(table)
+                    elif display_output == DisplayOutputFormat.JSON:
+                        console.print(Syntax(content, "json"))
+                else:
+                    console.print(
+                        f"[bold red]Invalid output type: {display_output.value}[/bold red]"
                     )
 
-                    # Format data
-                    status.update("[bold cyan]Formatting data...")
-                    formatted_data = await format_data(
-                        markdown,
-                        dynamic_listings_container,
-                        model,
-                        ai_provider,
-                        extraction_prompt,
-                        ai_base_url,
-                    )
-                    if not formatted_data:
-                        raise ValueError("No data was found by the scrape.")
+            if pricing:
+                display_price_summary(status, model, markdown, formatted_data_text)
 
-                    # Save formatted data
-                    status.update("[bold cyan]Saving formatted data...")
-                    _, file_paths = await save_formatted_data(
-                        formatted_data, run_name, output_folder
-                    )
+        except Exception as e:  # pylint: disable=broad-except
+            # print(e)
+            console.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
 
-                    # Convert formatted_data back to text for token counting
-                    formatted_data_text = json.dumps(formatted_data.dict())
-
-                # Display output if requested
-                if display_output:
-                    if display_output.value in file_paths:
-                        async with aiofiles.open(
-                            file_paths[display_output.value], "rt", encoding="utf-8"
-                        ) as f:
-                            content = await f.read()
-                        if display_output == DisplayOutputFormat.MD:
-                            console.print(Markdown(content))
-                        elif display_output == DisplayOutputFormat.CSV:
-                            # Convert CSV to rich Table
-                            table = Table(title="CSV Data")
-                            csv_reader = csv.reader(StringIO(content))
-                            headers = next(csv_reader)
-                            for header in headers:
-                                table.add_column(header, style="cyan")
-                            for row in csv_reader:
-                                table.add_row(*row)
-                            console.print(table)
-                        elif display_output == DisplayOutputFormat.JSON:
-                            console.print(Syntax(content, "json"))
-                    else:
+        finally:
+            if cleanup in [CleanupType.BOTH, CleanupType.AFTER]:
+                with console.status("[bold yellow]Cleaning up..."):
+                    if os.path.exists(output_folder):
+                        shutil.rmtree(output_folder)
                         console.print(
-                            f"[bold red]Invalid output type: {display_output.value}[/bold red]"
+                            f"[bold green]Removed output folder and its contents: {output_folder}[/bold green]"
                         )
-
-                if pricing:
-                    await display_price_summary(
-                        status, model, markdown, formatted_data_text
-                    )
-
-            except Exception as e:  # pylint: disable=broad-except
-                # print(e)
-                console.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
-
-            finally:
-                if cleanup in [CleanupType.BOTH, CleanupType.AFTER]:
-                    with console.status("[bold yellow]Cleaning up..."):
-                        if await aos.path.exists(output_folder):
-                            await asyncio.to_thread(shutil.rmtree, output_folder)
-                            console.print(
-                                f"[bold green]Removed output folder and its contents: {output_folder}[/bold green]"
-                            )
-
-    aiorun(_main())
 
 
 if __name__ == "__main__":

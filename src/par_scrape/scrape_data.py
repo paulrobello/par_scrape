@@ -5,12 +5,8 @@ import os
 from pathlib import Path
 from typing import List, Type, Tuple, Dict, Optional
 
-import aiofiles
-from aiofiles import open as aio_open
-from aiofiles import os as aos
-
 import pandas as pd
-from langchain_core.pydantic_v1 import BaseModel, create_model, ConfigDict
+from pydantic import BaseModel, create_model, ConfigDict
 from rich.panel import Panel
 
 from par_scrape.utils import console
@@ -18,7 +14,7 @@ from par_scrape.lib.llm_config import LlmConfig
 from par_scrape.lib.llm_providers import LlmProvider
 
 
-async def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
+def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
     """
     Save raw data to a file.
 
@@ -31,12 +27,12 @@ async def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> st
         str: The path to the saved file.
     """
     # Ensure the output folder exists
-    await aos.makedirs(output_folder, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
 
     # Save the raw markdown data with run_name in filename
     raw_output_path = os.path.join(output_folder, f"rawData_{run_name}.md")
-    async with aiofiles.open(raw_output_path, "wt", encoding="utf-8") as f:
-        await f.write(raw_data)
+    with open(raw_output_path, "wt", encoding="utf-8") as f:
+        f.write(raw_data)
     console.print(
         Panel(f"Raw data saved to [bold green]{raw_output_path}[/bold green]")
     )
@@ -77,7 +73,8 @@ def create_listings_container_model(listing_model: Type[BaseModel]) -> Type[Base
     return create_model("DynamicListingsContainer", listings=(List[listing_model], ...))
 
 
-async def format_data(
+# pylint: disable=too-many-positional-arguments
+def format_data(
     data: str,
     dynamic_listings_container: Type[BaseModel],
     model: str,
@@ -86,7 +83,7 @@ async def format_data(
     ai_base_url: Optional[str] = None,
 ) -> BaseModel:
     """
-    Format data using the specified AI provider's API asynchronously.
+    Format data using the specified AI provider's API.
 
     Args:
         data (str): The input data to format.
@@ -102,8 +99,7 @@ async def format_data(
     if not extraction_prompt:
         extraction_prompt = Path(__file__).parent / "extraction_prompt.md"
     try:
-        async with aio_open(extraction_prompt, "r") as file:
-            system_message = await file.read()
+        system_message = extraction_prompt.read_text(encoding="utf-8")
     except FileNotFoundError:
         console.print(
             f"[bold red]Extraction prompt file not found: {extraction_prompt}[/bold red]"
@@ -121,7 +117,7 @@ async def format_data(
         structure_model = chat_model.with_structured_output(
             dynamic_listings_container  # , include_raw=True
         )
-        data = await structure_model.ainvoke(
+        data = structure_model.invoke(
             [
                 ("system", system_message),
                 ("user", user_message),
@@ -138,9 +134,9 @@ async def format_data(
         return dynamic_listings_container(listings=[])
 
 
-async def save_formatted_data(
+def save_formatted_data(
     formatted_data: BaseModel, run_name: str, output_folder: Path
-) -> Tuple[pd.DataFrame | None, Dict[str, str]]:
+) -> Tuple[pd.DataFrame | None, Dict[str, Path]]:
     """
     Save formatted data to JSON, Excel, CSV, and Markdown files.
 
@@ -153,17 +149,19 @@ async def save_formatted_data(
         Tuple[pd.DataFrame | None, Dict[str, str]]: The DataFrame created from the formatted data and a dictionary of
         file paths, or None and an empty dict if an error occurred.
     """
-    file_paths: Dict[str, str] = {}
+    file_paths: Dict[str, Path] = {}
     # Ensure the output folder exists
-    await aos.makedirs(output_folder, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
 
     # Prepare formatted data as a dictionary
-    formatted_data_dict = formatted_data.dict()
+    formatted_data_dict = formatted_data.model_dump()
 
     # Save the formatted data as JSON with run_name in filename
-    json_output_path = os.path.join(output_folder, f"sorted_data_{run_name}.json")
-    with open(json_output_path, "wt", encoding="utf-8") as f:
-        json.dump(formatted_data_dict, f, indent=4)
+    json_output_path = output_folder / f"sorted_data_{run_name}.json"
+    json_output_path.write_text(
+        json.dumps(formatted_data_dict, indent=4), encoding="utf-8"
+    )
+
     console.print(
         Panel(
             f"Formatted data saved to JSON at [bold green]{json_output_path}[/bold green]"
@@ -192,7 +190,7 @@ async def save_formatted_data(
         console.print(Panel("[bold green]DataFrame created successfully.[/bold green]"))
 
         # Save the DataFrame to an Excel file
-        excel_output_path = os.path.join(output_folder, f"sorted_data_{run_name}.xlsx")
+        excel_output_path = output_folder / f"sorted_data_{run_name}.xlsx"
         df.to_excel(excel_output_path, index=False)
         console.print(
             Panel(
@@ -202,7 +200,7 @@ async def save_formatted_data(
         file_paths["excel"] = excel_output_path
 
         # Save the DataFrame to a CSV file
-        csv_output_path = os.path.join(output_folder, f"sorted_data_{run_name}.csv")
+        csv_output_path = output_folder / f"sorted_data_{run_name}.csv"
         df.to_csv(csv_output_path, index=False)
         console.print(
             Panel(
@@ -212,9 +210,10 @@ async def save_formatted_data(
         file_paths["csv"] = csv_output_path
 
         # Save the DataFrame as a Markdown table
-        markdown_output_path = os.path.join(output_folder, f"sorted_data_{run_name}.md")
-        with open(markdown_output_path, "wt", encoding="utf-8") as f:
-            f.write(df.to_markdown(index=False) or "")
+        markdown_output_path = output_folder / f"sorted_data_{run_name}.md"
+        markdown_output_path.write_text(
+            df.to_markdown(index=False) or "", encoding="utf-8"
+        )
         console.print(
             Panel(
                 f"Formatted data saved as Markdown table at [bold green]{markdown_output_path}[/bold green]"

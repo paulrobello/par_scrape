@@ -2,12 +2,12 @@
 
 import logging
 import os
-import asyncio
 import random
+import time
 
 import html2text
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
+from playwright.sync_api import sync_playwright
 from selenium import webdriver
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.chrome.options import Options
@@ -17,7 +17,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from .utils import console
 
 
-async def setup_selenium(headless: bool = True) -> WebDriver:
+def setup_selenium(headless: bool = True) -> WebDriver:
     """Set up ChromeDriver for Selenium."""
 
     logger = logging.getLogger("selenium")
@@ -46,14 +46,12 @@ async def setup_selenium(headless: bool = True) -> WebDriver:
     )
 
     try:
-        chromedriver_path = await asyncio.to_thread(ChromeDriverManager().install)
+        chromedriver_path = ChromeDriverManager().install()
 
         service = Service(chromedriver_path, log_output=os.devnull)
 
         # Initialize the WebDriver
-        driver = await asyncio.to_thread(
-            webdriver.Chrome, service=service, options=options
-        )
+        driver = webdriver.Chrome(service=service, options=options)
         return driver
     except Exception as e:
         console.print(
@@ -68,38 +66,32 @@ async def setup_selenium(headless: bool = True) -> WebDriver:
         raise
 
 
-async def fetch_html_selenium(
+def fetch_html_selenium(
     url: str, headless: bool = True, sleep_time: int = 5, pause: bool = False
 ) -> str:
     """Fetch HTML content from a URL using Selenium."""
-    driver = await setup_selenium(headless)
+    driver = setup_selenium(headless)
     try:
-        await asyncio.to_thread(driver.get, url)
+        driver.get(url)
 
         if pause:
             console.print("[yellow]Press Enter to continue...[/yellow]")
-            await asyncio.to_thread(input)
+            input()
         else:
             # Add delays to mimic human behavior
-            await asyncio.sleep(sleep_time)  # Use the specified sleep time
+            time.sleep(sleep_time)  # Use the specified sleep time
 
         # Add more realistic actions like scrolling
-        await asyncio.to_thread(
-            driver.execute_script, "window.scrollTo(0, document.body.scrollHeight);"
-        )
-        await asyncio.sleep(
-            random.uniform(3, 5)
-        )  # Simulate time taken to scroll and read
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(random.uniform(3, 5))  # Simulate time taken to scroll and read
 
-        html = await asyncio.to_thread(lambda: driver.page_source)
+        html = driver.page_source
         return html
     finally:
-        await asyncio.to_thread(driver.quit)
+        driver.quit()
 
 
-async def fetch_html_playwright(
-    url: str, sleep_time: int = 5, pause: bool = False
-) -> str:
+def fetch_html_playwright(url: str, sleep_time: int = 5, pause: bool = False) -> str:
     """
     Fetch HTML content from a URL using Playwright.
 
@@ -109,28 +101,41 @@ async def fetch_html_playwright(
     Returns:
         str: The HTML content of the page.
     """
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-        await page.goto(url)
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(headless=True)
+        except Exception as e:  # pylint: disable=broad-except
+            console.print(
+                "[bold red]Error launching playwright browser:[/bold red] Make sure you install playwright: `uv tool install playwright` then run `playwright install chromium`."  # pylint: disable=line-too-long
+                # pylint: disable=line-too-long
+            )
+            raise e
+            # return ["" * len(urls)]
+        context = browser.new_context(
+            viewport={"width": 1280, "height": 1024},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",  # pylint: disable=line-too-long
+        )
+
+        page = context.new_page()
+        page.goto(url)
 
         if pause:
             console.print("[yellow]Press Enter to continue...[/yellow]")
-            await asyncio.to_thread(input)
+            input()
         else:
             # Add delays to mimic human behavior
-            await asyncio.sleep(sleep_time)  # Use the specified sleep time
+            time.sleep(sleep_time)  # Use the specified sleep time
 
         # Add more realistic actions like scrolling
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        await asyncio.sleep(3)  # Simulate time taken to scroll and read
+        page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        time.sleep(3)  # Simulate time taken to scroll and read
 
-        html = await page.content()
-        await browser.close()
+        html = page.content()
+        browser.close()
         return html
 
 
-async def clean_html(html_content: str) -> str:
+def clean_html(html_content: str) -> str:
     """
     Clean HTML content by removing headers and footers.
 
@@ -149,7 +154,7 @@ async def clean_html(html_content: str) -> str:
     return str(soup)
 
 
-async def html_to_markdown_with_readability(html_content: str) -> str:
+def html_to_markdown_with_readability(html_content: str) -> str:
     """
     Convert HTML content to Markdown format.
 
@@ -159,11 +164,11 @@ async def html_to_markdown_with_readability(html_content: str) -> str:
     Returns:
         str: The converted markdown content.
     """
-    cleaned_html = await clean_html(html_content)
+    cleaned_html = clean_html(html_content)
 
     # Convert to markdown
     markdown_converter = html2text.HTML2Text()
     markdown_converter.ignore_links = False
-    markdown_content = await asyncio.to_thread(markdown_converter.handle, cleaned_html)
+    markdown_content = markdown_converter.handle(cleaned_html)
 
     return markdown_content

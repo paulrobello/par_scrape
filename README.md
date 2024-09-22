@@ -6,7 +6,6 @@
 ![Arch x86-63 | ARM | AppleSilicon](https://img.shields.io/badge/arch-x86--64%20%7C%20ARM%20%7C%20AppleSilicon-blue)  
 ![PyPI - License](https://img.shields.io/pypi/l/par-scrape)
 
-## About
 PAR Scrape is a versatile web scraping tool with options for Selenium or Playwright, featuring AI-powered data extraction and formatting.
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/probello3)
@@ -23,7 +22,7 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 - Token usage and cost estimation
 
 ## Known Issues
-- Silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
+- Selenium silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
 - Providers other than OpenAI are hit-and-miss depending on provider / model / data being extracted.
 
 ## Installation
@@ -54,6 +53,13 @@ uv tool install par-scrape
 
 ```bash
 pipx install par-scrape
+```
+### Playwright Installation
+To use playwright as a scraper, you must install it and its browsers using the following commands:
+
+```bash
+uv tool install playwright
+playwright install chromium
 ```
 
 ## Usage
@@ -133,6 +139,9 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```
 
 ## Whats New
+
+- Version 0.4.4:
+  - Better Playwright scraping.
 - Version 0.4.3:
   - Added option to override the base URL for the AI provider.
 - Version 0.4.2:
