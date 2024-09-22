@@ -91,9 +91,7 @@ def fetch_html_selenium(
         driver.quit()
 
 
-def fetch_html_playwright(
-    url: str, sleep_time: int = 5, pause: bool = False
-) -> str:
+def fetch_html_playwright(url: str, sleep_time: int = 5, pause: bool = False) -> str:
     """
     Fetch HTML content from a URL using Playwright.
 
@@ -104,8 +102,21 @@ def fetch_html_playwright(
         str: The HTML content of the page.
     """
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        try:
+            browser = p.chromium.launch(headless=True)
+        except Exception as e:  # pylint: disable=broad-except
+            console.print(
+                "[bold red]Error launching playwright browser:[/bold red] Make sure you install playwright: `uv tool install playwright` then run `playwright install chromium`."  # pylint: disable=line-too-long
+                # pylint: disable=line-too-long
+            )
+            raise e
+            # return ["" * len(urls)]
+        context = browser.new_context(
+            viewport={"width": 1280, "height": 1024},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",  # pylint: disable=line-too-long
+        )
+
+        page = context.new_page()
         page.goto(url)
 
         if pause:

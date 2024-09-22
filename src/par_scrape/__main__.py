@@ -82,7 +82,7 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-# pylint: disable=too-many-statements,dangerous-default-value,too-many-arguments, too-many-locals
+# pylint: disable=too-many-statements,dangerous-default-value,too-many-arguments, too-many-locals, too-many-positional-arguments, too-many-branches
 @app.command()
 def main(
     url: Annotated[
@@ -281,13 +281,9 @@ def main(
                     # Scrape data
                     status.update("[bold cyan]Fetching HTML...")
                     if scraper == ScraperChoice.PLAYWRIGHT:
-                        raw_html = fetch_html_playwright(
-                            url, sleep_time, pause
-                        )
+                        raw_html = fetch_html_playwright(url, sleep_time, pause)
                     else:
-                        raw_html = fetch_html_selenium(
-                            url, headless, sleep_time, pause
-                        )
+                        raw_html = fetch_html_selenium(url, headless, sleep_time, pause)
 
                     status.update("[bold cyan]Converting HTML to Markdown...")
                     markdown = html_to_markdown_with_readability(raw_html)
@@ -352,9 +348,7 @@ def main(
                     )
 
             if pricing:
-                display_price_summary(
-                    status, model, markdown, formatted_data_text
-                )
+                display_price_summary(status, model, markdown, formatted_data_text)
 
         except Exception as e:  # pylint: disable=broad-except
             # print(e)

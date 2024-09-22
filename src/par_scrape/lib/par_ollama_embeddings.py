@@ -6,8 +6,7 @@ from typing import List
 
 import ollama
 from langchain_core.embeddings import Embeddings
-from langchain_core.pydantic_v1 import BaseModel
-from langchain_core.pydantic_v1 import Extra
+from pydantic import BaseModel
 
 
 class ParOllamaEmbeddings(BaseModel, Embeddings):
@@ -30,7 +29,7 @@ class ParOllamaEmbeddings(BaseModel, Embeddings):
     class Config:
         """Configuration for this pydantic object."""
 
-        extra = Extra.forbid
+        extra = "forbid"
 
     def __init__(self, ollama_host: str, **kwargs) -> None:
         """Initialize OllamaEmbeddings."""
