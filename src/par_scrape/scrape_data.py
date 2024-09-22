@@ -5,10 +5,6 @@ import os
 from pathlib import Path
 from typing import List, Type, Tuple, Dict, Optional
 
-import aiofiles
-from aiofiles import open as aio_open
-from aiofiles import os as aos
-
 import pandas as pd
 from langchain_core.pydantic_v1 import BaseModel, create_model, ConfigDict
 from rich.panel import Panel
@@ -18,7 +14,7 @@ from par_scrape.lib.llm_config import LlmConfig
 from par_scrape.lib.llm_providers import LlmProvider
 
 
-async def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
+def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
     """
     Save raw data to a file.
 
@@ -31,12 +27,12 @@ async def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> st
         str: The path to the saved file.
     """
     # Ensure the output folder exists
-    await aos.makedirs(output_folder, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
 
     # Save the raw markdown data with run_name in filename
     raw_output_path = os.path.join(output_folder, f"rawData_{run_name}.md")
-    async with aiofiles.open(raw_output_path, "wt", encoding="utf-8") as f:
-        await f.write(raw_data)
+    with open(raw_output_path, "wt", encoding="utf-8") as f:
+        f.write(raw_data)
     console.print(
         Panel(f"Raw data saved to [bold green]{raw_output_path}[/bold green]")
     )
@@ -77,7 +73,7 @@ def create_listings_container_model(listing_model: Type[BaseModel]) -> Type[Base
     return create_model("DynamicListingsContainer", listings=(List[listing_model], ...))
 
 
-async def format_data(
+def format_data(
     data: str,
     dynamic_listings_container: Type[BaseModel],
     model: str,
@@ -86,7 +82,7 @@ async def format_data(
     ai_base_url: Optional[str] = None,
 ) -> BaseModel:
     """
-    Format data using the specified AI provider's API asynchronously.
+    Format data using the specified AI provider's API.
 
     Args:
         data (str): The input data to format.
@@ -102,8 +98,8 @@ async def format_data(
     if not extraction_prompt:
         extraction_prompt = Path(__file__).parent / "extraction_prompt.md"
     try:
-        async with aio_open(extraction_prompt, "r") as file:
-            system_message = await file.read()
+        with open(extraction_prompt, "r") as file:
+            system_message = file.read()
     except FileNotFoundError:
         console.print(
             f"[bold red]Extraction prompt file not found: {extraction_prompt}[/bold red]"
@@ -121,7 +117,7 @@ async def format_data(
         structure_model = chat_model.with_structured_output(
             dynamic_listings_container  # , include_raw=True
         )
-        data = await structure_model.ainvoke(
+        data = structure_model.invoke(
             [
                 ("system", system_message),
                 ("user", user_message),
@@ -138,7 +134,7 @@ async def format_data(
         return dynamic_listings_container(listings=[])
 
 
-async def save_formatted_data(
+def save_formatted_data(
     formatted_data: BaseModel, run_name: str, output_folder: Path
 ) -> Tuple[pd.DataFrame | None, Dict[str, str]]:
     """
@@ -155,7 +151,7 @@ async def save_formatted_data(
     """
     file_paths: Dict[str, str] = {}
     # Ensure the output folder exists
-    await aos.makedirs(output_folder, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
 
     # Prepare formatted data as a dictionary
     formatted_data_dict = formatted_data.dict()

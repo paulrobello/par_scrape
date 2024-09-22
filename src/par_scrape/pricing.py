@@ -1,8 +1,6 @@
 """Pricing functions for Par Scrape."""
 
 from typing import Tuple
-import asyncio
-
 import tiktoken
 from rich.panel import Panel
 from rich.status import Status
@@ -70,7 +68,7 @@ pricing = {
 }
 
 
-async def calculate_price(
+def calculate_price(
     input_text: str, output_text: str, model: str
 ) -> Tuple[int, int, float]:
     """
@@ -94,12 +92,10 @@ async def calculate_price(
             encoder = tiktoken.encoding_for_model(model)
 
             # Encode the input text to get the number of input tokens
-            input_token_count = await asyncio.to_thread(len, encoder.encode(input_text))
+            input_token_count = len(encoder.encode(input_text))
 
             # Encode the output text to get the number of output tokens
-            output_token_count = await asyncio.to_thread(
-                len, encoder.encode(output_text)
-            )
+            output_token_count = len(encoder.encode(output_text))
         except Exception as _:  # pylint: disable=broad-except
             console.print(
                 Panel.fit(
@@ -131,12 +127,12 @@ async def calculate_price(
     return input_token_count, output_token_count, total_cost
 
 
-async def display_price_summary(
+def display_price_summary(
     status: Status, model: str, markdown, formatted_data_text
 ) -> None:
     """Display the price summary."""
     status.update("[bold cyan]Calculating token usage and cost...")
-    input_tokens, output_tokens, total_cost = await calculate_price(
+    input_tokens, output_tokens, total_cost = calculate_price(
         markdown, formatted_data_text, model=model
     )
     if input_tokens == 0 or output_tokens == 0:
