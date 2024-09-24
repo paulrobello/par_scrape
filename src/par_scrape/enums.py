@@ -30,7 +30,9 @@ class ScraperChoice(str, Enum):
 class WaitType(str, Enum):
     """Enum for wait type choices."""
 
+    NONE = "none"
     PAUSE = "pause"
     SLEEP = "sleep"
     IDLE = "idle"
     SELECTOR = "selector"
+    TEXT = "text"

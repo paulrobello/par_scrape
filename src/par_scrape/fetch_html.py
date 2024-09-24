@@ -7,11 +7,15 @@ from typing import Optional
 
 import html2text
 from bs4 import BeautifulSoup
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 from selenium import webdriver
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
 from .enums import WaitType
@@ -20,7 +24,6 @@ from .utils import console
 
 def setup_selenium(headless: bool = True) -> WebDriver:
     """Set up ChromeDriver for Selenium."""
-
     logger = logging.getLogger("selenium")
     logger.setLevel(logging.DEBUG)
 
@@ -30,16 +33,17 @@ def setup_selenium(headless: bool = True) -> WebDriver:
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
+    options.add_argument("--window-position=-2400,-2400")
+
     options.add_experimental_option(
         "excludeSwitches", ["enable-logging"]
     )  # Disable logging
-    options.add_argument("--log-level=3")  # Suppress console logging
     options.add_argument("--silent")
     options.add_argument("--disable-extensions")
 
     # Enable headless mode if specified
     if headless:
-        options.add_argument("--headless")
+        options.add_argument("--headless=new")
 
     # Randomize user-agent to mimic different users
     options.add_argument(
@@ -48,6 +52,7 @@ def setup_selenium(headless: bool = True) -> WebDriver:
 
     try:
         chromedriver_path = ChromeDriverManager().install()
+        # console.log(chromedriver_path)
 
         service = Service(chromedriver_path, log_output=os.devnull)
 
@@ -72,26 +77,57 @@ def fetch_html_selenium(
     headless: bool = True,
     wait_type: WaitType = WaitType.SLEEP,
     wait_selector: Optional[str] = None,
-    sleep_time: int = 5,
+    sleep_time: int = 3,
 ) -> str:
-    """Fetch HTML content from a URL using Selenium."""
+    """
+    Fetch HTML content from a URL using Selenium.
+
+    Args:
+        url (str): The URL to fetch HTML content from.
+        headless (bool, optional): Whether to run the browser in headless mode. Defaults to True.
+        wait_type (WaitType, optional): The type of wait to use. Defaults to WaitType.SLEEP.
+        wait_selector (Optional[str], optional): The CSS selector to wait for. Defaults to None.
+        sleep_time (int, optional): The time to sleep in seconds. Defaults to 3.
+
+    Returns:
+        str: The fetched HTML content as a string.
+    """
     driver = setup_selenium(headless)
+    driver.set_script_timeout(30)
+
     try:
         driver.get(url)
+        try:
+            # Wait for page to load
+            if wait_type == WaitType.PAUSE:
+                console.print("[yellow]Press Enter to continue...[/yellow]")
+                input()
+            elif wait_type == WaitType.SLEEP and sleep_time > 0:
+                time.sleep(sleep_time)
+            elif wait_type == WaitType.IDLE:
+                time.sleep(1)
+            elif wait_type == WaitType.SELECTOR:
+                if wait_selector:
+                    wait = WebDriverWait(driver, 10)
+                    wait.until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, wait_selector))
+                    )
+            elif wait_type == WaitType.TEXT:
+                if wait_selector:
+                    wait = WebDriverWait(driver, 10)
+                    wait.until(
+                        EC.text_to_be_present_in_element(
+                            (By.TAG_NAME, "body"), wait_selector
+                        )
+                    )
 
-        if wait_type == WaitType.PAUSE:
-            console.print("[yellow]Press Enter to continue...[/yellow]")
-            input()
-        elif wait_type == WaitType.SLEEP:
-            # Add delays to mimic human behavior
-            time.sleep(sleep_time)  # Use the specified sleep time
+            # Add more realistic actions like scrolling
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(3)  # Simulate time taken to scroll and read
+        except TimeoutException:
+            console.print("[yellow]Timed out waiting for condition.[/yellow]")
 
-        # Add more realistic actions like scrolling
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(3)  # Simulate time taken to scroll and read
-
-        html = driver.page_source
-        return html
+        return driver.page_source
     finally:
         driver.quit()
 
@@ -99,16 +135,19 @@ def fetch_html_selenium(
 def fetch_html_playwright(
     url: str,
     headless: bool = True,
-    wait_type: WaitType = WaitType.SLEEP,
+    wait_type: WaitType = WaitType.IDLE,
     wait_selector: Optional[str] = None,
-    sleep_time: int = 5,
+    sleep_time: int = 3,
 ) -> str:
     """
     Fetch HTML content from a URL using Playwright.
 
     Args:
         url (str): The URL to fetch HTML from.
-
+        headless (bool, optional): Whether to run the browser in headless mode. Defaults to True.
+        wait_type (WaitType, optional): The type of wait to use. Defaults to WaitType.IDLE.
+        wait_selector (str, optional): The CSS selector to wait for. Defaults to None.
+        sleep_time (int, optional): The sleep time in seconds. Defaults to 3.
     Returns:
         str: The HTML content of the page.
     """
@@ -144,6 +183,13 @@ def fetch_html_playwright(
             else:
                 console.print(
                     "[bold yellow]Warning:[/bold yellow] Please specify a selector when using wait_type=selector."
+                )
+        elif wait_type == WaitType.TEXT:
+            if wait_selector:
+                expect(page.locator("body")).to_contain_text(wait_selector)
+            else:
+                console.print(
+                    "[bold yellow]Warning:[/bold yellow] Please specify a selector when using wait_type=text."
                 )
 
         # Add more realistic actions like scrolling

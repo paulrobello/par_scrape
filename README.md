@@ -95,10 +95,11 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 
 - `--url`, `-u`: The URL to scrape or path to a local file (default: "https://openai.com/api/pricing/")
 - `--fields`, `-f`: Fields to extract from the webpage (default: ["Model", "Pricing Input", "Pricing Output"])
-- `--scraper`, `-s`: Scraper to use: 'selenium' or 'playwright' (default: "selenium")
+- `--scraper`, `-s`: Scraper to use: 'selenium' or 'playwright' (default: "playwright")
 - `--headless`, `-h`: Run in headless mode (for Selenium) (default: False)
+- `--wait-type`, `-w`: Method to use for page content load waiting [none|pause|sleep|idle|selector|text] (default: sleep).
+- `--wait-selector`, `-i`: Selector or text to use for page content load waiting.
 - `--sleep-time`, `-t`: Time to sleep (in seconds) before scrolling and closing browser (default: 5)
-- `--pause`, `-p`: Wait for user input before closing browser (default: False)
 - `--ai-provider`, `-a`: AI provider to use for processing (default: "OpenAI")
 - `--model`, `-m`: AI model to use for processing. If not specified, a default model will be used based on the provider.
 - `--display-output`, `-d`: Display output in terminal (md, csv, or json)
@@ -115,19 +116,19 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 
 1. Basic usage with default options:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Model" -f "Pricing Input" -f "Pricing Output" --pricing
+par_scrape --url "https://openai.com/api/pricing/" -f "Model" -f "Pricing Input" -f "Pricing Output" --pricing -w text -i gpt-4o
 ```
 2. Using Playwright and displaying JSON output:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --scraper playwright -d json --pricing
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --scraper playwright -d json --pricing -w text -i gpt-4o
 ```
 3. Specifying a custom model and output folder:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --model gpt-4 --output-folder ./custom_output --pricing
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --model gpt-4 --output-folder ./custom_output --pricing -w text -i gpt-4o
 ```
 4. Running in silent mode with a custom run name:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --silent --run-name my_custom_run --pricing
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --silent --run-name my_custom_run --pricing -w text -i gpt-4o
 ```
 5. Using the cleanup option to remove the output folder after scraping:
 ```bash
@@ -141,9 +142,10 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ## Whats New
 
 - Version 0.4.5:
-  - Added new option --wait-type that allows you to specify the type of wait to use such as pause, sleep, idle, or selector.
+  - Added new option --wait-type that allows you to specify the type of wait to use such as pause, sleep, idle, text or selector.
   - Removed --pause option as it is no longer needed with --wait-type option.
   - Playwright scraping now honors the headless mode.
+  - Playwright is now the default scraper as it is much faster.
 - Version 0.4.4:
   - Better Playwright scraping.
 - Version 0.4.3:

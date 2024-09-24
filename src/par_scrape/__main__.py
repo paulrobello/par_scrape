@@ -4,6 +4,7 @@ import csv
 import json
 import os
 import shutil
+import time
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
@@ -66,9 +67,7 @@ def main(
     ] = "https://openai.com/api/pricing/",
     fields: Annotated[
         List[str],
-        typer.Option(
-            "--fields", "-f", help="Fields to extract from the webpage", prompt=True
-        ),
+        typer.Option("--fields", "-f", help="Fields to extract from the webpage"),
     ] = [
         "Model",
         "Pricing Input",
@@ -82,7 +81,7 @@ def main(
             help="Scraper to use: 'selenium' or 'playwright'",
             case_sensitive=False,
         ),
-    ] = ScraperChoice.SELENIUM,
+    ] = ScraperChoice.PLAYWRIGHT,
     wait_type: Annotated[
         WaitType,
         typer.Option(
@@ -97,7 +96,7 @@ def main(
         typer.Option(
             "--wait-selector",
             "-i",
-            help="Selector to use for page content load waiting.",
+            help="Selector or text to use for page content load waiting.",
         ),
     ] = None,
     headless: Annotated[
@@ -189,6 +188,9 @@ def main(
                 console.print(
                     f"[bold green]Removed existing output folder: {output_folder}[/bold green]"
                 )
+
+        start_time = time.time()
+
         try:
             # Generate run_name if not provided
             if not run_name:
@@ -227,8 +229,14 @@ def main(
                         ("Headless: ", "cyan"),
                         (f"{headless if not is_local_file else 'N/A'}", "green"),
                         "\n",
-                        (f"Wait Type: ", "cyan"),
+                        ("Wait Type: ", "cyan"),
                         (f"{wait_type.value}", "green"),
+                        "\n",
+                        ("Wait Selector: ", "cyan"),
+                        (
+                            f"{wait_selector if wait_type in (WaitType.SELECTOR, WaitType.TEXT) else 'N/A'}",
+                            "green",
+                        ),
                         "\n",
                         ("Sleep Time: ", "cyan"),
                         (
@@ -309,7 +317,7 @@ def main(
                 )
 
                 # Convert formatted_data back to text for token counting
-                formatted_data_text = json.dumps(formatted_data.dict())
+                formatted_data_text = json.dumps(formatted_data.model_dump())
 
             # Display output if requested
             if display_output:
@@ -337,6 +345,9 @@ def main(
                         f"[bold red]Invalid output type: {display_output.value}[/bold red]"
                     )
 
+            duration = time.time() - start_time
+            console.print(Panel.fit(f"Done in {duration:.2f} seconds."))
+            # Display price summary
             if pricing:
                 display_price_summary(status, model, markdown, formatted_data_text)
 
