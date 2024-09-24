@@ -140,6 +140,10 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 
 ## Whats New
 
+- Version 0.4.5:
+  - Added new option --wait-type that allows you to specify the type of wait to use such as pause, sleep, idle, or selector.
+  - Removed --pause option as it is no longer needed with --wait-type option.
+  - Playwright scraping now honors the headless mode.
 - Version 0.4.4:
   - Better Playwright scraping.
 - Version 0.4.3:

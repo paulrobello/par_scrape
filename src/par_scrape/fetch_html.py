@@ -2,8 +2,8 @@
 
 import logging
 import os
-import random
 import time
+from typing import Optional
 
 import html2text
 from bs4 import BeautifulSoup
@@ -14,6 +14,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
+from .enums import WaitType
 from .utils import console
 
 
@@ -67,23 +68,27 @@ def setup_selenium(headless: bool = True) -> WebDriver:
 
 
 def fetch_html_selenium(
-    url: str, headless: bool = True, sleep_time: int = 5, pause: bool = False
+    url: str,
+    headless: bool = True,
+    wait_type: WaitType = WaitType.SLEEP,
+    wait_selector: Optional[str] = None,
+    sleep_time: int = 5,
 ) -> str:
     """Fetch HTML content from a URL using Selenium."""
     driver = setup_selenium(headless)
     try:
         driver.get(url)
 
-        if pause:
+        if wait_type == WaitType.PAUSE:
             console.print("[yellow]Press Enter to continue...[/yellow]")
             input()
-        else:
+        elif wait_type == WaitType.SLEEP:
             # Add delays to mimic human behavior
             time.sleep(sleep_time)  # Use the specified sleep time
 
         # Add more realistic actions like scrolling
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(random.uniform(3, 5))  # Simulate time taken to scroll and read
+        time.sleep(3)  # Simulate time taken to scroll and read
 
         html = driver.page_source
         return html
@@ -91,7 +96,13 @@ def fetch_html_selenium(
         driver.quit()
 
 
-def fetch_html_playwright(url: str, sleep_time: int = 5, pause: bool = False) -> str:
+def fetch_html_playwright(
+    url: str,
+    headless: bool = True,
+    wait_type: WaitType = WaitType.SLEEP,
+    wait_selector: Optional[str] = None,
+    sleep_time: int = 5,
+) -> str:
     """
     Fetch HTML content from a URL using Playwright.
 
@@ -103,7 +114,7 @@ def fetch_html_playwright(url: str, sleep_time: int = 5, pause: bool = False) ->
     """
     with sync_playwright() as p:
         try:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(headless=headless)
         except Exception as e:  # pylint: disable=broad-except
             console.print(
                 "[bold red]Error launching playwright browser:[/bold red] Make sure you install playwright: `uv tool install playwright` then run `playwright install chromium`."  # pylint: disable=line-too-long
@@ -119,12 +130,21 @@ def fetch_html_playwright(url: str, sleep_time: int = 5, pause: bool = False) ->
         page = context.new_page()
         page.goto(url)
 
-        if pause:
+        if wait_type == WaitType.PAUSE:
             console.print("[yellow]Press Enter to continue...[/yellow]")
             input()
-        else:
+        elif wait_type == WaitType.SLEEP:
             # Add delays to mimic human behavior
-            time.sleep(sleep_time)  # Use the specified sleep time
+            page.wait_for_timeout(sleep_time * 1000)  # Use the specified sleep time
+        elif wait_type == WaitType.IDLE:
+            page.wait_for_load_state("networkidle")  # domcontentloaded
+        elif wait_type == WaitType.SELECTOR:
+            if wait_selector:
+                page.wait_for_selector(wait_selector)
+            else:
+                console.print(
+                    "[bold yellow]Warning:[/bold yellow] Please specify a selector when using wait_type=selector."
+                )
 
         # Add more realistic actions like scrolling
         page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
