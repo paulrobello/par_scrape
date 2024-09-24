@@ -4,11 +4,11 @@ import csv
 import json
 import os
 import shutil
+import time
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
 from typing import List, Optional, Annotated
-from enum import Enum
 from uuid import uuid4
 from contextlib import nullcontext
 
@@ -21,6 +21,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
+from par_scrape.enums import CleanupType, DisplayOutputFormat, ScraperChoice, WaitType
 from par_scrape.scrape_data import (
     save_raw_data,
     create_dynamic_listing_model,
@@ -51,30 +52,6 @@ load_dotenv(dotenv_path=Path("~/.par-scrape.env").expanduser())
 app = typer.Typer(help="Web scraping tool with options for Selenium or Playwright")
 
 
-class CleanupType(str, Enum):
-    """Enum for cleanup choices."""
-
-    NONE = "none"
-    BEFORE = "before"
-    AFTER = "after"
-    BOTH = "both"
-
-
-class DisplayOutputFormat(str, Enum):
-    """Enum for display output format choices."""
-
-    MD = "md"
-    CSV = "csv"
-    JSON = "json"
-
-
-class ScraperChoice(str, Enum):
-    """Enum for scraper choices."""
-
-    SELENIUM = "selenium"
-    PLAYWRIGHT = "playwright"
-
-
 def version_callback(value: bool) -> None:
     """Print version and exit."""
     if value:
@@ -86,13 +63,11 @@ def version_callback(value: bool) -> None:
 @app.command()
 def main(
     url: Annotated[
-        str, typer.Option("--url", "-u", help="URL to scrape", prompt=True)
+        str, typer.Option("--url", "-u", help="URL to scrape")
     ] = "https://openai.com/api/pricing/",
     fields: Annotated[
         List[str],
-        typer.Option(
-            "--fields", "-f", help="Fields to extract from the webpage", prompt=True
-        ),
+        typer.Option("--fields", "-f", help="Fields to extract from the webpage"),
     ] = [
         "Model",
         "Pricing Input",
@@ -106,7 +81,24 @@ def main(
             help="Scraper to use: 'selenium' or 'playwright'",
             case_sensitive=False,
         ),
-    ] = ScraperChoice.SELENIUM,
+    ] = ScraperChoice.PLAYWRIGHT,
+    wait_type: Annotated[
+        WaitType,
+        typer.Option(
+            "--wait-type",
+            "-w",
+            help="Method to use for page content load waiting",
+            case_sensitive=False,
+        ),
+    ] = WaitType.SLEEP,
+    wait_selector: Annotated[
+        Optional[str],
+        typer.Option(
+            "--wait-selector",
+            "-i",
+            help="Selector or text to use for page content load waiting.",
+        ),
+    ] = None,
     headless: Annotated[
         bool,
         typer.Option("--headless", "-h", help="Run in headless mode (for Selenium)"),
@@ -117,12 +109,6 @@ def main(
             "--sleep-time", "-t", help="Time to sleep before scrolling (in seconds)"
         ),
     ] = 3,
-    pause: Annotated[
-        bool,
-        typer.Option(
-            "--pause", "-p", help="Wait for user input before closing browser"
-        ),
-    ] = False,
     ai_provider: Annotated[
         LlmProvider,
         typer.Option("--ai-provider", "-a", help="AI provider to use for processing"),
@@ -202,6 +188,9 @@ def main(
                 console.print(
                     f"[bold green]Removed existing output folder: {output_folder}[/bold green]"
                 )
+
+        start_time = time.time()
+
         try:
             # Generate run_name if not provided
             if not run_name:
@@ -240,14 +229,20 @@ def main(
                         ("Headless: ", "cyan"),
                         (f"{headless if not is_local_file else 'N/A'}", "green"),
                         "\n",
+                        ("Wait Type: ", "cyan"),
+                        (f"{wait_type.value}", "green"),
+                        "\n",
+                        ("Wait Selector: ", "cyan"),
+                        (
+                            f"{wait_selector if wait_type in (WaitType.SELECTOR, WaitType.TEXT) else 'N/A'}",
+                            "green",
+                        ),
+                        "\n",
                         ("Sleep Time: ", "cyan"),
                         (
                             f"{sleep_time if not is_local_file else 'N/A'} seconds",
                             "green",
                         ),
-                        "\n",
-                        ("Pause: ", "cyan"),
-                        (f"{pause if not is_local_file else 'N/A'}", "green"),
                         "\n",
                         ("Fields to extract: ", "cyan"),
                         (", ".join(fields), "green"),
@@ -281,9 +276,13 @@ def main(
                     # Scrape data
                     status.update("[bold cyan]Fetching HTML...")
                     if scraper == ScraperChoice.PLAYWRIGHT:
-                        raw_html = fetch_html_playwright(url, sleep_time, pause)
+                        raw_html = fetch_html_playwright(
+                            url, headless, wait_type, wait_selector, sleep_time
+                        )
                     else:
-                        raw_html = fetch_html_selenium(url, headless, sleep_time, pause)
+                        raw_html = fetch_html_selenium(
+                            url, headless, wait_type, wait_selector, sleep_time
+                        )
 
                     status.update("[bold cyan]Converting HTML to Markdown...")
                     markdown = html_to_markdown_with_readability(raw_html)
@@ -318,7 +317,7 @@ def main(
                 )
 
                 # Convert formatted_data back to text for token counting
-                formatted_data_text = json.dumps(formatted_data.dict())
+                formatted_data_text = json.dumps(formatted_data.model_dump())
 
             # Display output if requested
             if display_output:
@@ -346,6 +345,9 @@ def main(
                         f"[bold red]Invalid output type: {display_output.value}[/bold red]"
                     )
 
+            duration = time.time() - start_time
+            console.print(Panel.fit(f"Done in {duration:.2f} seconds."))
+            # Display price summary
             if pricing:
                 display_price_summary(status, model, markdown, formatted_data_text)
 

@@ -10,6 +10,7 @@ from typing import Optional
 
 from langchain._api import LangChainDeprecationWarning
 from langchain_anthropic import ChatAnthropic
+from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.llms.ollama import Ollama
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
@@ -24,7 +25,6 @@ from langchain_openai import OpenAIEmbeddings
 
 
 from par_scrape.lib.llm_providers import LlmProvider
-from par_scrape.lib.par_ollama_embeddings import ParOllamaEmbeddings
 
 
 warnings.simplefilter("ignore", category=LangChainDeprecationWarning)
@@ -103,8 +103,8 @@ class LlmConfig:
                     base_url=self.base_url or ollama_host,
                 )
             if self.mode == LlmMode.EMBEDDINGS:
-                return ParOllamaEmbeddings(
-                    ollama_host=self.base_url or ollama_host, model=self.model_name
+                return OllamaEmbeddings(
+                    base_url=self.base_url or ollama_host, model=self.model_name
                 )
         elif self.provider == LlmProvider.OPENAI:
             if self.mode == LlmMode.BASE:
