@@ -221,7 +221,7 @@ def main(
                         (f"{model}", "green"),
                         "\n",
                         ("AI Provider Base URL: ", "cyan"),
-                        (f"{base_url or 'default'}", "green"),
+                        (f"{ai_base_url or 'default'}", "green"),
                         "\n",
                         ("Scraper: ", "cyan"),
                         (f"{scraper if not is_local_file else 'N/A'}", "green"),
