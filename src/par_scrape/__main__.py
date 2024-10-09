@@ -14,7 +14,6 @@ from contextlib import nullcontext
 
 import typer
 from dotenv import load_dotenv
-from openai import base_url
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -43,10 +42,19 @@ from par_scrape.lib.llm_providers import (
     provider_env_key_names,
 )
 
+new_env_path = Path("~/.par_scrape.env").expanduser()
+old_env_path = Path("~/.par-scrape.env").expanduser()
+if old_env_path.exists():
+    if new_env_path.exists():
+        old_env_path.unlink()
+    else:
+        console.print(f"[bold yellow]Renaming {old_env_path} to {new_env_path}")
+        old_env_path.rename(new_env_path)
+
 # Load the .env file from the project folder
 load_dotenv(dotenv_path=".env")
-# Load the .env file from the users home folder
-load_dotenv(dotenv_path=Path("~/.par-scrape.env").expanduser())
+# Load the new .env file from the users home folder
+load_dotenv(dotenv_path=new_env_path)
 
 # Initialize Typer app
 app = typer.Typer(help="Web scraping tool with options for Selenium or Playwright")
