@@ -1,10 +1,10 @@
 # PAR Scrape
 
-[![PyPI](https://img.shields.io/pypi/v/par-scrape)](https://pypi.org/project/par-scrape/)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/par-scrape.svg)](https://pypi.org/project/par-scrape/)  
+[![PyPI](https://img.shields.io/pypi/v/par_scrape)](https://pypi.org/project/par_scrape/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/par_scrape.svg)](https://pypi.org/project/par_scrape/)  
 ![Runs on Linux | MacOS | Windows](https://img.shields.io/badge/runs%20on-Linux%20%7C%20MacOS%20%7C%20Windows-blue)
 ![Arch x86-63 | ARM | AppleSilicon](https://img.shields.io/badge/arch-x86--64%20%7C%20ARM%20%7C%20AppleSilicon-blue)  
-![PyPI - License](https://img.shields.io/pypi/l/par-scrape)
+![PyPI - License](https://img.shields.io/pypi/l/par_scrape)
 
 PAR Scrape is a versatile web scraping tool with options for Selenium or Playwright, featuring AI-powered data extraction and formatting.
 
@@ -25,9 +25,24 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 - Selenium silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
 - Providers other than OpenAI are hit-and-miss depending on provider / model / data being extracted.
 
+## Prerequisites
+
+To install PAR Scrape, make sure you have Python 3.11.
+
+### [uv](https://pypi.org/project/uv/) is recommended
+
+#### Linux and Mac
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+#### Windows
+```bash
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
 ## Installation
 
-To install PAR Scrape, make sure you have Python 3.11 or higher and [uv](https://pypi.org/project/uv/) installed.
 
 ### Installation From Source
 
@@ -48,11 +63,11 @@ Then, follow these steps:
 To install PAR Scrape from PyPI, run any of the following commands:
 
 ```bash
-uv tool install par-scrape
+uv tool install par_scrape
 ```
 
 ```bash
-pipx install par-scrape
+pipx install par_scrape
 ```
 ### Playwright Installation
 To use playwright as a scraper, you must install it and its browsers using the following commands:
@@ -73,7 +88,7 @@ The key names for supported providers are as follows:
 - Google: `GOOGLE_API_KEY`
 - Ollama: `Not needed`
 
-You can also store your key in the file `~/.par-scrape.env` as follows:
+You can also store your key in the file `~/.par_scrape.env` as follows:
 ```
 OPENAI_API_KEY=your_api_key
 ANTHROPIC_API_KEY=your_api_key
@@ -140,7 +155,12 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```
 
 ## Whats New
-
+- Version 0.4.6:
+  - Minor bug fixes.
+  - Updating pricing data.
+  - Added support for Amazon Bedrock
+  - Removed some unnecessary dependencies.
+  - Code cleanup.
 - Version 0.4.5:
   - Added new option --wait-type that allows you to specify the type of wait to use such as pause, sleep, idle, text or selector.
   - Removed --pause option as it is no longer needed with --wait-type option.
@@ -154,7 +174,7 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
   - The url parameter can now point to a local rawData_*.md file for easier testing of different models without having to re-fetch the data.
   - Added ability to specify file with extraction prompt.
   - Tweaked extraction prompt to work with Groq and Anthropic. Google still does not work.
-  - Remove need for ~/.par-scrape-config.json-
+  - Remove need for ~/.par-scrape-config.json
 - Version 0.4.1:
   - Minor bug fixes for pricing summary.
   - Default model for google changed to "gemini-1.5-pro-exp-0827" which is free and usually works well.

@@ -6,66 +6,8 @@ from rich.panel import Panel
 from rich.status import Status
 from rich.text import Text
 
+from par_scrape.pricing_lookup import pricing_lookup
 from par_scrape.utils import console, estimate_tokens
-
-pricing = {
-    "gpt-4o": {
-        "input": 0.000005,  # $5.00 per 1M input tokens
-        "output": 0.000015,  # $15.00 per 1M output tokens
-    },
-    "gpt-4o-2024-08-06": {
-        "input": 0.0000025,  # $2.50 per 1M input tokens
-        "output": 0.00001,  # $10.00 per 1M output tokens
-    },
-    "gpt-4o-2024-05-13": {
-        "input": 0.000005,  # $5.00 per 1M input tokens
-        "output": 0.000015,  # $15.00 per 1M output tokens
-    },
-    "gpt-4o-mini": {
-        "input": 0.00000015,  # $0.15 per 1M input tokens
-        "output": 0.0000006,  # $0.60 per 1M output tokens
-    },
-    "gpt-4o-mini-2024-07-18": {
-        "input": 0.00000015,  # $0.15 per 1M input tokens
-        "output": 0.0000006,  # $0.60 per 1M output tokens
-    },
-    "gpt-4": {
-        "input": 0.00003,  # $30.00 per 1M input tokens
-        "output": 0.00006,  # $60.00 per 1M output tokens
-    },
-    "gpt-4-32k": {
-        "input": 0.00006,  # $60.00 per 1M input tokens
-        "output": 0.00012,  # $120.00 per 1M output tokens
-    },
-    "gpt-4-turbo": {
-        "input": 0.00001,  # $10.00 per 1M input tokens
-        "output": 0.00003,  # $30.00 per 1M output tokens
-    },
-    "gpt-4-turbo-2024-04-09": {
-        "input": 0.00001,  # $10.00 per 1M input tokens
-        "output": 0.00003,  # $30.00 per 1M output tokens
-    },
-    "gpt-3.5-turbo-0125": {
-        "input": 0.0000005,  # $0.50 per 1M input tokens
-        "output": 0.0000015,  # $1.50 per 1M output tokens
-    },
-    "claude-3-5-sonnet-20240620": {
-        "input": 0.000003,  # $3.0 per 1M input tokens
-        "output": 0.000015,  # $15.0 per 1M output tokens
-    },
-    "claude-3-haiku-20240307": {
-        "input": 0.00000025,  # $0.25 per 1M input tokens
-        "output": 0.00000125,  # $1.25 per 1M output tokens
-    },
-    "claude-3-sonnet-20240229": {
-        "input": 0.000003,  # $3.0 per 1M input tokens
-        "output": 0.000015,  # $15.0 per 1M output tokens
-    },
-    "claude-3-opus-20240229": {
-        "input": 0.000015,  # $15.0 per 1M input tokens
-        "output": 0.000075,  # $75.0 per 1M output tokens
-    },
-}
 
 
 def calculate_price(
@@ -108,9 +50,9 @@ def calculate_price(
             output_token_count = estimate_tokens(output_text)
 
         # Calculate the costs
-        if model in pricing:
-            pricing_in = pricing[model]["input"]
-            pricing_out = pricing[model]["output"]
+        if model in pricing_lookup:
+            pricing_in = pricing_lookup[model]["input"]
+            pricing_out = pricing_lookup[model]["output"]
         else:
             pricing_in = 0
             pricing_out = 0

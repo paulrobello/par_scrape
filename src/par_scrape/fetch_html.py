@@ -214,10 +214,32 @@ def clean_html(html_content: str) -> str:
     soup = BeautifulSoup(html_content, "html.parser")
 
     # Remove headers and footers based on common HTML tags or classes
-    for element in soup.find_all(["header", "footer"]):
+    for element in soup.find_all(
+        [
+            "header",
+            "footer",
+            "script",
+            "source",
+            "style",
+            "head",
+            "img",
+            "svg",
+            "iframe",
+        ]
+    ):
         element.decompose()  # Remove these tags and their content
 
-    return str(soup)
+    html_content = soup.prettify(formatter="html")
+
+    ### text separators
+    # Find all elements with role="separator"
+    separator_elements = soup.find_all(attrs={"role": "separator"})
+
+    # replace with <hr> element, markdown recognizes this
+    for element in separator_elements:
+        html_content = html_content.replace(str(element), "<hr>")
+
+    return html_content
 
 
 def html_to_markdown_with_readability(html_content: str) -> str:
@@ -231,6 +253,8 @@ def html_to_markdown_with_readability(html_content: str) -> str:
         str: The converted markdown content.
     """
     cleaned_html = clean_html(html_content)
+    cleaned_html = cleaned_html.replace("<pre", "```<pre")
+    cleaned_html = cleaned_html.replace("</pre>", "</pre>```")
 
     # Convert to markdown
     markdown_converter = html2text.HTML2Text()
