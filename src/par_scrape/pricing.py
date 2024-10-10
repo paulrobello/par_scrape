@@ -6,7 +6,7 @@ from rich.panel import Panel
 from rich.status import Status
 from rich.text import Text
 
-from par_scrape.pricing_lookup import pricing_lookup
+from par_scrape.lib.pricing_lookup import pricing_lookup
 from par_scrape.utils import console, estimate_tokens
 
 
