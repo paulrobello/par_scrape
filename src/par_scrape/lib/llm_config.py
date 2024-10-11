@@ -292,7 +292,7 @@ class LlmConfig:
                 temperature=self.temperature,
                 streaming=self.streaming,
                 base_url=self.base_url,
-                default_headers={"anthropic-beta": "tools-2024-05-16"},
+                default_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
                 timeout=self.timeout,
                 top_k=self.top_k,
                 top_p=self.top_p,
