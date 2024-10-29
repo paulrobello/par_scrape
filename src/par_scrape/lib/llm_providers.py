@@ -44,9 +44,9 @@ provider_default_models: dict[LlmProvider, str] = {
     LlmProvider.OLLAMA: "",
     LlmProvider.OPENAI: "gpt-4o",
     LlmProvider.GROQ: "llama3-70b-8192",
-    LlmProvider.ANTHROPIC: "claude-3-5-sonnet-20240620",
+    LlmProvider.ANTHROPIC: "claude-3-5-sonnet-20241022",
     LlmProvider.GOOGLE: "gemini-1.5-pro-002",
-    LlmProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+    LlmProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20241022-v2:0",
 }
 
 provider_light_models: dict[LlmProvider, str] = {
