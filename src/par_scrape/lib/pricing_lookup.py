@@ -7,7 +7,7 @@ from rich.console import Console
 from .llm_config import LlmConfig
 
 # Initialize rich console
-console = Console()
+console = Console(stderr=True)
 
 pricing_lookup = {
     "chatgpt-4o-latest": {

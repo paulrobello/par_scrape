@@ -12,14 +12,6 @@ class CleanupType(str, Enum):
     BOTH = "both"
 
 
-class DisplayOutputFormat(str, Enum):
-    """Enum for display output format choices."""
-
-    MD = "md"
-    CSV = "csv"
-    JSON = "json"
-
-
 class ScraperChoice(str, Enum):
     """Enum for scraper choices."""
 

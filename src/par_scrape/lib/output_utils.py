@@ -4,10 +4,23 @@ from __future__ import annotations
 
 import csv
 import io
+from enum import Enum
 from pathlib import Path
 
+from rich.console import Console
+from rich.markdown import Markdown
 from rich.syntax import Syntax
 from rich.table import Table
+
+console = Console(stderr=True)
+
+
+class DisplayOutputFormat(str, Enum):
+    """Enum for display output format choices."""
+
+    MD = "md"
+    CSV = "csv"
+    JSON = "json"
 
 
 def csv_to_table(data: str, title: str = "Results") -> Table:
@@ -46,3 +59,26 @@ def highlight_json(data: str) -> Syntax:
 def highlight_json_file(json_file: Path) -> Syntax:
     """Highlight JSON data."""
     return highlight_json(json_file.read_text(encoding="utf-8").strip())
+
+
+def display_formatted_output(
+    content: str, display_format: DisplayOutputFormat, out_console: Console | None = None
+) -> None:
+    """Display formatted output."""
+    if not out_console:
+        out_console = console
+
+    if display_format == DisplayOutputFormat.MD:
+        out_console.print(Markdown(content))
+    elif display_format == DisplayOutputFormat.CSV:
+        # Convert CSV to rich Table
+        table = Table(title="CSV Data")
+        csv_reader = csv.reader(io.StringIO(content))
+        headers = next(csv_reader)
+        for header in headers:
+            table.add_column(header, style="cyan")
+        for row in csv_reader:
+            table.add_row(*row)
+        out_console.print(table)
+    elif display_format == DisplayOutputFormat.JSON:
+        out_console.print(Syntax(content, "json"))

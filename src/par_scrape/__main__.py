@@ -1,12 +1,10 @@
 """Main entry point for par_scrape."""
 
-import csv
 import json
 import os
 import shutil
 import time
 from datetime import datetime
-from io import StringIO
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
@@ -14,13 +12,11 @@ from contextlib import nullcontext
 
 import typer
 from dotenv import load_dotenv
-from rich.markdown import Markdown
 from rich.panel import Panel
-from rich.syntax import Syntax
-from rich.table import Table
 from rich.text import Text
 
-from par_scrape.enums import CleanupType, DisplayOutputFormat, ScraperChoice, WaitType
+from par_scrape.enums import CleanupType, ScraperChoice, WaitType
+from par_scrape.lib.output_utils import DisplayOutputFormat, display_formatted_output
 from par_scrape.scrape_data import (
     save_raw_data,
     create_dynamic_listing_model,
@@ -67,7 +63,6 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-# pylint: disable=too-many-statements,dangerous-default-value,too-many-arguments, too-many-locals, too-many-positional-arguments, too-many-branches
 @app.command()
 def main(
     url: Annotated[str, typer.Option("--url", "-u", help="URL to scrape")] = "https://openai.com/api/pricing/",
@@ -153,10 +148,6 @@ def main(
         str,
         typer.Option("--run-name", "-n", help="Specify a name for this run"),
     ] = "",
-    version: Annotated[  # pylint: disable=unused-argument
-        bool | None,
-        typer.Option("--version", "-v", callback=version_callback, is_eager=True),
-    ] = None,
     pricing: Annotated[
         bool,
         typer.Option("--pricing", help="Enable pricing summary display"),
@@ -168,6 +159,10 @@ def main(
     extraction_prompt: Annotated[
         Path | None,
         typer.Option("--extraction-prompt", "-e", help="Path to the extraction prompt file"),
+    ] = None,
+    version: Annotated[  # pylint: disable=unused-argument
+        bool | None,
+        typer.Option("--version", "-v", callback=version_callback, is_eager=True),
     ] = None,
 ):
     """Scrape and analyze data from a website."""
@@ -306,20 +301,7 @@ def main(
                 if display_output.value in file_paths:
                     with open(file_paths[display_output.value], encoding="utf-8") as f:
                         content = f.read()
-                    if display_output == DisplayOutputFormat.MD:
-                        console.print(Markdown(content))
-                    elif display_output == DisplayOutputFormat.CSV:
-                        # Convert CSV to rich Table
-                        table = Table(title="CSV Data")
-                        csv_reader = csv.reader(StringIO(content))
-                        headers = next(csv_reader)
-                        for header in headers:
-                            table.add_column(header, style="cyan")
-                        for row in csv_reader:
-                            table.add_row(*row)
-                        console.print(table)
-                    elif display_output == DisplayOutputFormat.JSON:
-                        console.print(Syntax(content, "json"))
+                    display_formatted_output(content, display_output, console)
                 else:
                     console.print(f"[bold red]Invalid output type: {display_output.value}[/bold red]")
 
