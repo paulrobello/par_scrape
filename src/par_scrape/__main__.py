@@ -174,7 +174,7 @@ def main(
     if not model:
         model = provider_default_models[ai_provider]
 
-    if ai_provider != LlmProvider.OLLAMA:
+    if ai_provider not in [LlmProvider.OLLAMA, LlmProvider.BEDROCK]:
         key_name = provider_env_key_names[ai_provider]
         if not os.environ.get(key_name):
             console.print(f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]")

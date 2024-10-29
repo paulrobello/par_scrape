@@ -18,7 +18,7 @@ from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
 from .enums import WaitType
-from .lib.agents import get_random_user_agent
+from .lib.user_agents import get_random_user_agent
 from .utils import console
 
 
