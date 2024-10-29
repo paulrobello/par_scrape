@@ -1,6 +1,5 @@
 """Pricing functions for Par Scrape."""
 
-from typing import Tuple
 import tiktoken
 from rich.panel import Panel
 from rich.status import Status
@@ -10,9 +9,7 @@ from par_scrape.lib.pricing_lookup import pricing_lookup
 from par_scrape.utils import console, estimate_tokens
 
 
-def calculate_price(
-    input_text: str, output_text: str, model: str
-) -> Tuple[int, int, float]:
+def calculate_price(input_text: str, output_text: str, model: str) -> tuple[int, int, float]:
     """
     Calculate the price for processing input and output text using a specified model.
 
@@ -39,13 +36,7 @@ def calculate_price(
             # Encode the output text to get the number of output tokens
             output_token_count = len(encoder.encode(output_text))
         except Exception as _:  # pylint: disable=broad-except
-            console.print(
-                Panel.fit(
-                    Text.assemble(
-                        ("Could not get encoder. Falling back to estimator.", "yellow")
-                    )
-                )
-            )
+            console.print(Panel.fit(Text.assemble(("Could not get encoder. Falling back to estimator.", "yellow"))))
             input_token_count = estimate_tokens(input_text)
             output_token_count = estimate_tokens(output_text)
 
@@ -61,28 +52,16 @@ def calculate_price(
         output_cost = output_token_count * pricing_out
         total_cost = input_cost + output_cost
     except Exception as _:  # pylint: disable=broad-except
-        console.print(
-            Panel.fit(
-                Text.assemble(("Error calculating token usage and or cost.", "red"))
-            )
-        )
+        console.print(Panel.fit(Text.assemble(("Error calculating token usage and or cost.", "red"))))
     return input_token_count, output_token_count, total_cost
 
 
-def display_price_summary(
-    status: Status, model: str, markdown, formatted_data_text
-) -> None:
+def display_price_summary(status: Status, model: str, markdown, formatted_data_text) -> None:
     """Display the price summary."""
     status.update("[bold cyan]Calculating token usage and cost...")
-    input_tokens, output_tokens, total_cost = calculate_price(
-        markdown, formatted_data_text, model=model
-    )
+    input_tokens, output_tokens, total_cost = calculate_price(markdown, formatted_data_text, model=model)
     if input_tokens == 0 or output_tokens == 0:
-        console.print(
-            Panel.fit(
-                Text.assemble(("Could not calculate token usage and cost.", "yellow"))
-            )
-        )
+        console.print(Panel.fit(Text.assemble(("Could not calculate token usage and cost.", "yellow"))))
     else:
         console.print(
             Panel.fit(

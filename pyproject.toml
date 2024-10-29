@@ -76,9 +76,8 @@ build-backend = "hatchling.build"
 dev-dependencies = [
     "build>=1.2.1",
     "twine>=5.1.1",
-    "black>=24.8.0",
-    "pylint>=3.2.7",
     "pyright>=1.1.379",
+    "ruff>=0.7.0",
     "pre-commit>=3.8.0",
 ]
 

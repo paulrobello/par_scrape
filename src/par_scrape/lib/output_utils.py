@@ -5,7 +5,6 @@ from __future__ import annotations
 import csv
 import io
 from pathlib import Path
-from typing import Optional
 
 from rich.syntax import Syntax
 from rich.table import Table
@@ -31,7 +30,7 @@ def csv_to_table(data: str, title: str = "Results") -> Table:
     return table
 
 
-def csv_file_to_table(csv_file: Path, title: Optional[str] = None) -> Table:
+def csv_file_to_table(csv_file: Path, title: str | None = None) -> Table:
     """Convert csv file to a table."""
     return csv_to_table(
         csv_file.read_text(encoding="utf-8").strip(),
