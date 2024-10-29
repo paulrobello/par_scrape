@@ -49,6 +49,15 @@ provider_default_models: dict[LlmProvider, str] = {
     LlmProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20240620-v1:0",
 }
 
+provider_lite_models: dict[LlmProvider, str] = {
+    LlmProvider.OLLAMA: "",
+    LlmProvider.OPENAI: "gpt-4o-mini",
+    LlmProvider.GROQ: "llama3-70b-8192",
+    LlmProvider.ANTHROPIC: "claude-3-haiku-20240307",
+    LlmProvider.GOOGLE: "gemini-1.5-flash-002",
+    LlmProvider.BEDROCK: "anthropic.claude-3-haiku-20240307-v1:0",
+}
+
 provider_env_key_names: dict[LlmProvider, str] = {
     LlmProvider.OLLAMA: "",
     LlmProvider.OPENAI: "OPENAI_API_KEY",

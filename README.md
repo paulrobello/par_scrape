@@ -155,6 +155,9 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```
 
 ## Whats New
+- Version 0.4.7:
+  - Added pool of user agents that gets randomly pulled from.
+  - Updating pricing data.
 - Version 0.4.6:
   - Minor bug fixes.
   - Updating pricing data.
