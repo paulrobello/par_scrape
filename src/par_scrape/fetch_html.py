@@ -151,7 +151,7 @@ def fetch_html_playwright(
             # return ["" * len(urls)]
         context = browser.new_context(
             viewport={"width": 1280, "height": 1024},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",  # pylint: disable=line-too-long
+            user_agent=get_random_user_agent()
         )
 
         page = context.new_page()
