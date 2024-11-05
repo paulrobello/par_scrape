@@ -3,7 +3,6 @@
 import logging
 import os
 import time
-from typing import Optional
 
 import html2text
 from bs4 import BeautifulSoup
@@ -19,6 +18,7 @@ from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
 from .enums import WaitType
+from .lib.user_agents import get_random_user_agent
 from .utils import console
 
 
@@ -33,22 +33,20 @@ def setup_selenium(headless: bool = True) -> WebDriver:
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
-    options.add_argument("--window-position=-2400,-2400")
+    options.add_argument("--disable-search-engine-choice-screen")
+    options.add_argument("--disable-blink-features=AutomationControlled")
 
-    options.add_experimental_option(
-        "excludeSwitches", ["enable-logging"]
-    )  # Disable logging
+    options.add_experimental_option("excludeSwitches", ["enable-logging"])  # Disable logging
     options.add_argument("--silent")
     options.add_argument("--disable-extensions")
 
     # Enable headless mode if specified
     if headless:
+        options.add_argument("--window-position=-2400,-2400")
         options.add_argument("--headless=new")
 
     # Randomize user-agent to mimic different users
-    options.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"  # pylint: disable=line-too-long
-    )
+    options.add_argument("user-agent=" + get_random_user_agent())
 
     try:
         chromedriver_path = ChromeDriverManager().install()
@@ -60,15 +58,9 @@ def setup_selenium(headless: bool = True) -> WebDriver:
         driver = webdriver.Chrome(service=service, options=options)
         return driver
     except Exception as e:
-        console.print(
-            f"[bold red]Error initializing Chrome WebDriver:[/bold red] {str(e)}"
-        )
-        console.print(
-            "[yellow]Please ensure Chrome is installed and up to date.[/yellow]"
-        )
-        console.print(
-            "[yellow]Also, make sure the ChromeDriver version matches your Chrome browser version.[/yellow]"
-        )
+        console.print(f"[bold red]Error initializing Chrome WebDriver:[/bold red] {str(e)}")
+        console.print("[yellow]Please ensure Chrome is installed and up to date.[/yellow]")
+        console.print("[yellow]Also, make sure the ChromeDriver version matches your Chrome browser version.[/yellow]")
         raise
 
 
@@ -76,7 +68,7 @@ def fetch_html_selenium(
     url: str,
     headless: bool = True,
     wait_type: WaitType = WaitType.SLEEP,
-    wait_selector: Optional[str] = None,
+    wait_selector: str | None = None,
     sleep_time: int = 3,
 ) -> str:
     """
@@ -97,6 +89,8 @@ def fetch_html_selenium(
 
     try:
         driver.get(url)
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
         try:
             # Wait for page to load
             if wait_type == WaitType.PAUSE:
@@ -109,19 +103,13 @@ def fetch_html_selenium(
             elif wait_type == WaitType.SELECTOR:
                 if wait_selector:
                     wait = WebDriverWait(driver, 10)
-                    wait.until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, wait_selector))
-                    )
+                    wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, wait_selector)))
             elif wait_type == WaitType.TEXT:
                 if wait_selector:
                     wait = WebDriverWait(driver, 10)
-                    wait.until(
-                        EC.text_to_be_present_in_element(
-                            (By.TAG_NAME, "body"), wait_selector
-                        )
-                    )
+                    wait.until(EC.text_to_be_present_in_element((By.TAG_NAME, "body"), wait_selector))
 
-            # Add more realistic actions like scrolling
+            # Scroll to bottom of page
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(3)  # Simulate time taken to scroll and read
         except TimeoutException:
@@ -136,7 +124,7 @@ def fetch_html_playwright(
     url: str,
     headless: bool = True,
     wait_type: WaitType = WaitType.IDLE,
-    wait_selector: Optional[str] = None,
+    wait_selector: str | None = None,
     sleep_time: int = 3,
 ) -> str:
     """
@@ -161,10 +149,7 @@ def fetch_html_playwright(
             )
             raise e
             # return ["" * len(urls)]
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 1024},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",  # pylint: disable=line-too-long
-        )
+        context = browser.new_context(viewport={"width": 1280, "height": 1024}, user_agent=get_random_user_agent())
 
         page = context.new_page()
         page.goto(url)

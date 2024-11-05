@@ -122,7 +122,7 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 - `--silent`, `-q`: Run in silent mode, suppressing output (default: False)
 - `--run-name`, `-n`: Specify a name for this run
 - `--version`, `-v`: Show the version and exit
-- `--pricing`: Enable pricing summary display (default: False)
+- `--pricing`: Enable pricing summary display ('details','cost', 'none') (default: 'none')
 - `--cleanup`, `-c`: How to handle cleanup of output folder (choices: none, before, after, both) (default: none)
 - `--extraction-prompt`, `-e`: Path to alternate extraction prompt file
 - `--ai-base-url`, `-b`: Override the base URL for the AI provider.
@@ -155,6 +155,11 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```
 
 ## Whats New
+- Version 0.4.7:
+  - BREAKING CHANGE: --pricing cli option now takes a string value of 'details', 'cost', or 'none'.
+  - Added pool of user agents that gets randomly pulled from.
+  - Updating pricing data.
+  - Pricing token capture and compute now much more accurate.
 - Version 0.4.6:
   - Minor bug fixes.
   - Updating pricing data.
