@@ -1,6 +1,5 @@
 """Main entry point for par_scrape."""
 
-import json
 import os
 import shutil
 import time
@@ -16,7 +15,10 @@ from rich.panel import Panel
 from rich.text import Text
 
 from par_scrape.enums import CleanupType, ScraperChoice, WaitType
+from par_scrape.lib.llm_config import LlmConfig
 from par_scrape.lib.output_utils import DisplayOutputFormat, display_formatted_output
+from par_scrape.lib.pricing_lookup import show_llm_cost, PricingDisplay
+from par_scrape.lib.provider_cb_info import get_parai_callback
 from par_scrape.scrape_data import (
     save_raw_data,
     create_dynamic_listing_model,
@@ -29,10 +31,9 @@ from par_scrape.fetch_html import (
     fetch_html_playwright,
     html_to_markdown_with_readability,
 )
-from par_scrape.pricing import display_price_summary
-from par_scrape.utils import console
-from par_scrape import __version__, __application_title__
-from par_scrape.lib.llm_providers import (
+from .utils import console
+from . import __version__, __application_title__
+from .lib.llm_providers import (
     LlmProvider,
     provider_default_models,
     provider_env_key_names,
@@ -149,9 +150,9 @@ def main(
         typer.Option("--run-name", "-n", help="Specify a name for this run"),
     ] = "",
     pricing: Annotated[
-        bool,
-        typer.Option("--pricing", help="Enable pricing summary display"),
-    ] = False,
+        PricingDisplay,
+        typer.Option("--pricing", "-p", help="Enable pricing summary display"),
+    ] = PricingDisplay.NONE,
     cleanup: Annotated[
         CleanupType,
         typer.Option("--cleanup", "-c", help="How to handle cleanup of output folder."),
@@ -239,6 +240,9 @@ def main(
                         ("Display output: ", "cyan"),
                         (f"{display_output or 'None'}", "green"),
                         "\n",
+                        ("Pricing Display: ", "cyan"),
+                        (f"{pricing.value}", "green"),
+                        "\n",
                         ("Silent mode: ", "cyan"),
                         (f"{silent}", "green"),
                         "\n",
@@ -271,45 +275,43 @@ def main(
                     status.update("[bold cyan]Saving raw data...")
                     save_raw_data(markdown, run_name, output_folder)
 
-                # Create the dynamic listing model
-                status.update("[bold cyan]Creating dynamic models...")
-                dynamic_listing_model = create_dynamic_listing_model(fields)
-                dynamic_listings_container = create_listings_container_model(dynamic_listing_model)
+                llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0, base_url=ai_base_url)
+                with get_parai_callback(llm_config) as cb:
+                    # Create the dynamic listing model
+                    status.update("[bold cyan]Creating dynamic models...")
+                    dynamic_listing_model = create_dynamic_listing_model(fields)
+                    dynamic_listings_container = create_listings_container_model(dynamic_listing_model)
 
-                # Format data
-                status.update("[bold cyan]Formatting data...")
-                formatted_data = format_data(
-                    markdown,
-                    dynamic_listings_container,
-                    model,
-                    ai_provider,
-                    extraction_prompt,
-                    ai_base_url,
-                )
-                if not formatted_data:
-                    raise ValueError("No data was found by the scrape.")
+                    # Format data
+                    status.update("[bold cyan]Formatting data...")
+                    formatted_data = format_data(
+                        markdown,
+                        dynamic_listings_container,
+                        model,
+                        ai_provider,
+                        extraction_prompt,
+                        ai_base_url,
+                    )
+                    if not formatted_data:
+                        raise ValueError("No data was found by the scrape.")
 
-                # Save formatted data
-                status.update("[bold cyan]Saving formatted data...")
-                _, file_paths = save_formatted_data(formatted_data, run_name, output_folder)
+                    # Save formatted data
+                    status.update("[bold cyan]Saving formatted data...")
+                    _, file_paths = save_formatted_data(formatted_data, run_name, output_folder)
 
-                # Convert formatted_data back to text for token counting
-                formatted_data_text = json.dumps(formatted_data.model_dump())
-
-            # Display output if requested
-            if display_output:
-                if display_output.value in file_paths:
-                    with open(file_paths[display_output.value], encoding="utf-8") as f:
-                        content = f.read()
-                    display_formatted_output(content, display_output, console)
-                else:
-                    console.print(f"[bold red]Invalid output type: {display_output.value}[/bold red]")
+                # Display output if requested
+                if display_output:
+                    if display_output.value in file_paths:
+                        with open(file_paths[display_output.value], encoding="utf-8") as f:
+                            content = f.read()
+                        display_formatted_output(content, display_output, console)
+                    else:
+                        console.print(f"[bold red]Invalid output type: {display_output.value}[/bold red]")
 
             duration = time.time() - start_time
             console.print(Panel.fit(f"Done in {duration:.2f} seconds."))
             # Display price summary
-            if pricing:
-                display_price_summary(status, model, markdown, formatted_data_text)
+            show_llm_cost(llm_config, cb.usage_metadata, show_pricing=pricing)
 
         except Exception as e:  # pylint: disable=broad-except
             # print(e)

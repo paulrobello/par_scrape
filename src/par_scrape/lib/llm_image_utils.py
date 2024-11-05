@@ -7,6 +7,10 @@ from typing import Literal, Any
 import base64
 
 
+class UnsupportedImageTypeError(ValueError):
+    """Unsupported image type error."""
+
+
 def b64_encode_image(image_path: bytes) -> str:
     """Encode an image as base64."""
     return base64.b64encode(image_path).decode("utf-8")
@@ -26,7 +30,7 @@ def try_get_image_type(image_path: str | Path) -> Literal["jpeg", "png", "gif"]:
         return "png"
     if ext in ["gif"]:
         return "gif"
-    raise ValueError(f"Unsupported image type: {ext}")
+    raise UnsupportedImageTypeError(f"Unsupported image type: {ext}")
 
 
 def image_to_base64(image_bytes: bytes, image_type: Literal["jpeg", "png", "gif"] = "jpeg") -> str:

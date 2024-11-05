@@ -149,10 +149,7 @@ def fetch_html_playwright(
             )
             raise e
             # return ["" * len(urls)]
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 1024},
-            user_agent=get_random_user_agent()
-        )
+        context = browser.new_context(viewport={"width": 1280, "height": 1024}, user_agent=get_random_user_agent())
 
         page = context.new_page()
         page.goto(url)
