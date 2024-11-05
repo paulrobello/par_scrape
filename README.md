@@ -81,19 +81,16 @@ playwright install chromium
 
 To use PAR Scrape, you can run it from the command line with various options. Here's a basic example:
 Ensure you have the AI provider api key in your environment.
-The key names for supported providers are as follows:
-- OpenAI: `OPENAI_API_KEY`
-- Anthropic: `ANTHROPIC_API_KEY`
-- Groq: `GROQ_API_KEY`
-- Google: `GOOGLE_API_KEY`
-- Ollama: `Not needed`
-
-You can also store your key in the file `~/.par_scrape.env` as follows:
+You can also store your api keys in the file `~/.par_scrape.env` as follows:
 ```
-OPENAI_API_KEY=your_api_key
-ANTHROPIC_API_KEY=your_api_key
-GROQ_API_KEY=your_api_key
-GOOGLE_API_KEY=your_api_key
+* GROQ_API_KEY is required for Groq. Get a free key from https://console.groq.com/
+* ANTHROPIC_API_KEY is required for Anthropic. Get a key from https://console.anthropic.com/
+* OPENAI_API_KEY is required for OpenAI. Get a key from https://platform.openai.com/account/api-keys
+* GITHUB_TOKEN is required for GitHub Models. Get a free key from https://github.com/marketplace/models
+* GOOGLE_API_KEY is required for Google Models. Get a free key from https://console.cloud.google.com
+* LANGCHAIN_API_KEY is required for Langchain Langsmith tracing. Get a free key from https://smith.langchain.com/settings
+* AWS_PROFILE is used for Bedrock authentication. The environment must already be authenticated with AWS.
+* No key required to use with Ollama models.
 ```
 
 ### Running from source
