@@ -46,7 +46,7 @@ provider_default_models: dict[LlmProvider, str] = {
     LlmProvider.OLLAMA: "",
     LlmProvider.OPENAI: "gpt-4o",
     LlmProvider.GROQ: "llama3-70b-8192",
-    LlmProvider.ANTHROPIC: "claude-3-5-sonnet-20241022",
+    LlmProvider.ANTHROPIC: "claude-3-5-sonnet-latest",
     LlmProvider.GOOGLE: "gemini-1.5-pro-002",
     LlmProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     LlmProvider.GITHUB: "gpt-4o",
@@ -56,9 +56,9 @@ provider_light_models: dict[LlmProvider, str] = {
     LlmProvider.OLLAMA: "",
     LlmProvider.OPENAI: "gpt-4o-mini",
     LlmProvider.GROQ: "llama3-70b-8192",
-    LlmProvider.ANTHROPIC: "claude-3-haiku-20240307",
+    LlmProvider.ANTHROPIC: "claude-3-5-haiku-latest",
     LlmProvider.GOOGLE: "gemini-1.5-flash-002",
-    LlmProvider.BEDROCK: "anthropic.claude-3-haiku-20240307-v1:0",
+    LlmProvider.BEDROCK: "anthropic.claude-3-5-haiku-20241022-v1:0",
     LlmProvider.GITHUB: "gpt-4o-mini",
 }
 
