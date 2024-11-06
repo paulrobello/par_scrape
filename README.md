@@ -15,15 +15,20 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 
 ## Features
 
-- Web scraping using Selenium or Playwright
+- Web scraping using Playwright or Selenium 
 - AI-powered data extraction and formatting
 - Supports multiple output formats (JSON, Excel, CSV, Markdown)
 - Customizable field extraction
 - Token usage and cost estimation
+- Prompt cache for Anthropic provider
 
 ## Known Issues
 - Selenium silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
 - Providers other than OpenAI are hit-and-miss depending on provider / model / data being extracted.
+
+## Prompt Cache
+- OpenAI will auto cache prompts that are over 1024 tokens.
+- Anthropic will only cache prompts if you specify the --prompt-cache flag. Due to cache writes costing more only enable this if you intend to run multiple scrape jobs against the same url, also the cache will go stale within a couple of minutes so to reduce cost run your jobs as close together as possible.
 
 ## Prerequisites
 
@@ -82,25 +87,25 @@ playwright install chromium
 To use PAR Scrape, you can run it from the command line with various options. Here's a basic example:
 Ensure you have the AI provider api key in your environment.
 You can also store your api keys in the file `~/.par_scrape.env` as follows:
-```
-* GROQ_API_KEY is required for Groq. Get a free key from https://console.groq.com/
-* ANTHROPIC_API_KEY is required for Anthropic. Get a key from https://console.anthropic.com/
-* OPENAI_API_KEY is required for OpenAI. Get a key from https://platform.openai.com/account/api-keys
-* GITHUB_TOKEN is required for GitHub Models. Get a free key from https://github.com/marketplace/models
-* GOOGLE_API_KEY is required for Google Models. Get a free key from https://console.cloud.google.com
-* LANGCHAIN_API_KEY is required for Langchain Langsmith tracing. Get a free key from https://smith.langchain.com/settings
-* AWS_PROFILE is used for Bedrock authentication. The environment must already be authenticated with AWS.
-* No key required to use with Ollama models.
+```bash
+GROQ_API_KEY= # is required for Groq. Get a free key from https://console.groq.com/
+ANTHROPIC_API_KEY= # is required for Anthropic. Get a key from https://console.anthropic.com/
+OPENAI_API_KEY= # is required for OpenAI. Get a key from https://platform.openai.com/account/api-keys
+GITHUB_TOKEN= # is required for GitHub Models. Get a free key from https://github.com/marketplace/models
+GOOGLE_API_KEY= # is required for Google Models. Get a free key from https://console.cloud.google.com
+LANGCHAIN_API_KEY= # is required for Langchain Langsmith tracing. Get a free key from https://smith.langchain.com/settings
+AWS_PROFILE= # is used for Bedrock authentication. The environment must already be authenticated with AWS.
+# No key required to use with Ollama models.
 ```
 
 ### Running from source
 ```bash
-uv run par_scrape --url "https://openai.com/api/pricing/" --fields "Model" --fields "Pricing Input" --fields "Pricing Output" --scraper selenium --model gpt-4o-mini --display-output md
+uv run par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" -f "Cache Price" --model gpt-4o-mini --display-output md
 ```
 
 ### Running if installed from PyPI
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of Points" "Creator" "Time Posted" "Number of Comments" --scraper selenium --model gpt-4o-mini --display-output md
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" -f "Cache Price" --model gpt-4o-mini --display-output md
 ```
 
 ### Options
@@ -114,6 +119,7 @@ par_scrape --url "https://openai.com/api/pricing/" --fields "Title" "Number of P
 - `--sleep-time`, `-t`: Time to sleep (in seconds) before scrolling and closing browser (default: 5)
 - `--ai-provider`, `-a`: AI provider to use for processing (default: "OpenAI")
 - `--model`, `-m`: AI model to use for processing. If not specified, a default model will be used based on the provider.
+- `--prompt-cache`: Enable prompt cache for Anthropic provider. (default: False)
 - `--display-output`, `-d`: Display output in terminal (md, csv, or json)
 - `--output-folder`, `-o`: Specify the location of the output folder (default: "./output")
 - `--silent`, `-q`: Run in silent mode, suppressing output (default: False)
@@ -150,8 +156,14 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```bash
 par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --pause --pricing
 ```
+7. Using Anthropic provider with prompt cache enabled and detailed pricing breakdown:
+```bash
+par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Description" -f "Price" -f "Cache Price"
+```
 
 ## Whats New
+- Version 0.4.8:
+  - Added Anthropic prompt cache option.
 - Version 0.4.7:
   - BREAKING CHANGE: --pricing cli option now takes a string value of 'details', 'cost', or 'none'.
   - Added pool of user agents that gets randomly pulled from.

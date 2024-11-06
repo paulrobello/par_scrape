@@ -74,6 +74,7 @@ def main(
         "Model",
         "Pricing Input",
         "Pricing Output",
+        "Cache Price"
     ],
     scraper: Annotated[
         ScraperChoice,
@@ -129,6 +130,10 @@ def main(
             help="Override the base URL for the AI provider.",
         ),
     ] = None,
+    prompt_cache: Annotated[
+        bool,
+        typer.Option("--prompt-cache", help="Enable prompt cache for Anthropic provider"),
+    ] = False,
     display_output: Annotated[
         DisplayOutputFormat | None,
         typer.Option(
@@ -175,6 +180,11 @@ def main(
         if not os.environ.get(key_name):
             console.print(f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]")
             raise typer.Exit(1)
+
+    if prompt_cache and ai_provider != LlmProvider.ANTHROPIC:
+        console.print("[bold red]Prompt cache flag is only available for Anthropic provider. Exiting...[/bold red]")
+        raise typer.Exit(1)
+
     with console.capture() if silent else nullcontext():
         if cleanup in [CleanupType.BEFORE, CleanupType.BOTH]:
             if os.path.exists(output_folder):
@@ -212,6 +222,9 @@ def main(
                         "\n",
                         ("AI Provider Base URL: ", "cyan"),
                         (f"{ai_base_url or 'default'}", "green"),
+                        "\n",
+                        ("Prompt Cache: ", "cyan"),
+                        (f"{prompt_cache}", "green"),
                         "\n",
                         ("Scraper: ", "cyan"),
                         (f"{scraper if not is_local_file else 'N/A'}", "green"),
@@ -285,12 +298,11 @@ def main(
                     # Format data
                     status.update("[bold cyan]Formatting data...")
                     formatted_data = format_data(
-                        markdown,
-                        dynamic_listings_container,
-                        model,
-                        ai_provider,
-                        extraction_prompt,
-                        ai_base_url,
+                        data=markdown,
+                        dynamic_listings_container=dynamic_listings_container,
+                        llm_config=llm_config,
+                        prompt_cache=prompt_cache,
+                        extraction_prompt=extraction_prompt,
                     )
                     if not formatted_data:
                         raise ValueError("No data was found by the scrape.")

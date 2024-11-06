@@ -5,12 +5,12 @@ import os
 from pathlib import Path
 
 import pandas as pd
+from langchain_anthropic import ChatAnthropic
 from pydantic import BaseModel, create_model, ConfigDict
 from rich.panel import Panel
 
 from par_scrape.utils import console
 from par_scrape.lib.llm_config import LlmConfig
-from par_scrape.lib.llm_providers import LlmProvider
 
 
 def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
@@ -72,12 +72,12 @@ def create_listings_container_model(listing_model: type[BaseModel]) -> type[Base
 
 # pylint: disable=too-many-positional-arguments
 def format_data(
+    *,
     data: str,
     dynamic_listings_container: type[BaseModel],
-    model: str,
-    ai_provider: LlmProvider,
+    llm_config: LlmConfig,
+    prompt_cache: bool = False,
     extraction_prompt: Path | None = None,
-    ai_base_url: str | None = None,
 ) -> BaseModel:
     """
     Format data using the specified AI provider's API.
@@ -85,8 +85,7 @@ def format_data(
     Args:
         data (str): The input data to format.
         dynamic_listings_container (Type[BaseModel]): The Pydantic model to use for parsing.
-        model (str): The AI model to use for processing.
-        ai_provider (LlmProvider): The AI provider to use for processing.
+        llm_config (LlmConfig): The configuration for the AI provider.
         extraction_prompt (Path): Path to the extraction prompt file.
         ai_base_url (str): The base URL for the AI provider.
 
@@ -104,18 +103,27 @@ def format_data(
     user_message = f"Extract the following information from the provided text:\nPage content:\n\n{data}"
 
     try:
-        llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0, base_url=ai_base_url)
         chat_model = llm_config.build_chat_model()
 
         structure_model = chat_model.with_structured_output(
             dynamic_listings_container  # , include_raw=True
         )
-        data = structure_model.invoke(
-            [
-                ("system", system_message),
-                ("user", user_message),
-            ]
-        )  # type: ignore
+        history = [
+            ("system", system_message),
+            (
+                "user",
+                [
+                    {
+                        "type": "text",
+                        "text": user_message
+                    }
+                ],
+            ),        ]
+
+        if prompt_cache and isinstance(chat_model, ChatAnthropic):
+            history[1][1][0]["cache_control"] = {"type": "ephemeral"}  # type: ignore
+
+        data = structure_model.invoke(history)  # type: ignore
         if isinstance(data, BaseModel):
             return data
         console.print(data)
@@ -166,8 +174,6 @@ def save_formatted_data(
     # Create DataFrame
     try:
         df = pd.DataFrame(data_for_df)
-        console.print(Panel("[bold green]DataFrame created successfully.[/bold green]"))
-
         # Save the DataFrame to an Excel file
         excel_output_path = output_folder / f"sorted_data_{run_name}.xlsx"
         df.to_excel(excel_output_path, index=False)
