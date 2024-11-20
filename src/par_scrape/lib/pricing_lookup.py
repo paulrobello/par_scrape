@@ -245,7 +245,12 @@ def show_llm_cost(
         return
     if not console:
         console = Console(stderr=True)
-    cost = get_api_call_cost(llm_config, usage_metadata)
+
+    if "total_cost" in usage_metadata:
+        cost = usage_metadata["total_cost"]
+    else:
+        cost = get_api_call_cost(llm_config, usage_metadata)
+
     if show_pricing == PricingDisplay.DETAILS:
         console.print(
             Panel.fit(
