@@ -54,6 +54,8 @@ class LlmConfig:
     """Base url the model is hosted under."""
     timeout: int | None = None
     """Timeout in seconds."""
+    user_agent_appid: str | None = None
+    """App id to add to user agent for the API request. Can be used for authenticating"""
     class_name: str = "LlmConfig"
     """Used for serialization."""
     num_ctx: int | None = None
@@ -111,6 +113,7 @@ class LlmConfig:
             "streaming": self.streaming,
             "base_url": self.base_url,
             "timeout": self.timeout,
+            "user_agent_appid": self.user_agent_appid,
             "num_ctx": self.num_ctx,
             "num_predict": self.num_predict,
             "repeat_last_n": self.repeat_last_n,
@@ -353,13 +356,17 @@ class LlmConfig:
         from langchain_aws import BedrockLLM, ChatBedrockConverse, BedrockEmbeddings
 
         session = boto3.Session(
-            region_name=os.environ.get("AWS_REGION"),
+            region_name=os.environ.get("AWS_REGION", "us-east-1"),
             profile_name=os.environ.get("AWS_PROFILE"),
+            aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            aws_session_token=os.environ.get("AWS_SESSION_TOKEN"),
         )
-        config = Config(connect_timeout=self.timeout, read_timeout=self.timeout)
+        config = Config(connect_timeout=self.timeout, read_timeout=self.timeout, user_agent_appid=self.user_agent_appid)
         bedrock_client = session.client(
             "bedrock-runtime",
             config=config,
+            endpoint_url=self.base_url,
         )
 
         if self.mode == LlmMode.BASE:
@@ -369,6 +376,7 @@ class LlmConfig:
                 temperature=self.temperature,
                 streaming=self.streaming,
                 max_tokens=self.max_tokens,
+                endpoint_url=self.base_url,
             )
         if self.mode == LlmMode.CHAT:
             return ChatBedrockConverse(
@@ -377,11 +385,13 @@ class LlmConfig:
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
                 top_p=self.top_p,
+                endpoint_url=self.base_url,
             )
         if self.mode == LlmMode.EMBEDDINGS:
             return BedrockEmbeddings(
                 client=bedrock_client,
                 model_id=self.model_name or "amazon.titan-embed-text-v1",
+                endpoint_url=self.base_url,
             )
 
         raise ValueError(f"Invalid LLM mode '{self.mode}'")
