@@ -34,15 +34,6 @@ console = Console(stderr=True)
 
 DECIMAL_PRECESSION = 5
 
-def md(soup: BeautifulSoup, **options) -> str:
-    """
-    Convert BeautifulSoup object to Markdown.
-
-    :param soup: The BeautifulSoup object to convert.
-    :param options: Additional options to pass to the converter.
-    :return: The converted Markdown string.
-    """
-    return MarkdownConverter(**options).convert_soup(soup)
 
 def has_stdin_content():
     if os.name == "nt":  # Windows
