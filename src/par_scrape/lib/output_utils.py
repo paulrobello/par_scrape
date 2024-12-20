@@ -65,34 +65,37 @@ def highlight_json_file(json_file: Path) -> Syntax:
 
 def get_output_format_prompt(display_format: DisplayOutputFormat) -> str:
     """Get the output format prompt."""
-    preamble = """Follow the following instructions for output:"""
     if display_format == DisplayOutputFormat.MD:
-        return f"""
-{preamble}
-    * Output properly formatted Markdown.
-    * Use table / list formatting when applicable or requested.
-    * Do not include an opening ```markdown or closing ```
+        return """
+<output_instructions>
+    <instruction>Output properly formatted Markdown.</instruction>
+    <instruction>Use table / list formatting when applicable or requested.</instruction>
+    <instruction>Do not include an opening ```markdown or closing ```</instruction>
+</output_instructions>
 """
     if display_format == DisplayOutputFormat.JSON:
-        return f"""
-{preamble}
-    * Output proper JSON.
-    * Use a schema if provided.
-    * Only output JSON. Do not include any other text / markdown or formatting such as opening ```json or closing ```
+        return """
+<output_instructions>
+    <instruction>Output proper JSON.</instruction>
+    <instruction>Use a schema if provided.</instruction>
+    <instruction>Only output JSON. Do not include any other text / markdown or formatting such as opening ```json or closing ```</instruction>
+</output_instructions>
 """
     if display_format == DisplayOutputFormat.CSV:
-        return f"""
-{preamble}
-    * Output proper CSV format.
-    * Ensure you use double quotes on fields containing line breaks or commas.
-    * Include a header with names of the fields.
-    * Only output the CSV header and data.
-    * Do not include any other text / Markdown such as opening ```csv or closing ```
+        return """
+<output_instructions>
+    <instruction>Output proper CSV format.</instruction>
+    <instruction>Ensure you use double quotes on fields containing line breaks or commas.</instruction>
+    <instruction>Include a header with names of the fields.</instruction>
+    <instruction>Only output the CSV header and data.</instruction>
+    <instruction>Do not include any other text / Markdown such as opening ```csv or closing ```</instruction>
+</output_instructions>
 """
     if display_format == DisplayOutputFormat.PLAIN:
-        return f"""
-{preamble}
-    * Output plain text without formatting, do not include any other formatting such as markdown.
+        return """
+<output_instructions>
+    <instruction>Output plain text without formatting, do not include any other formatting such as markdown.</instruction>
+</output_instructions>
 """
     return ""
 

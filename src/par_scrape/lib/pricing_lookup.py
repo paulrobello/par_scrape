@@ -2,9 +2,9 @@
 
 from enum import StrEnum
 
+from rich.console import Console
 from rich.panel import Panel
 from rich.pretty import Pretty
-from rich.console import Console
 
 from .llm_config import LlmConfig
 from .llm_providers import LlmProvider
@@ -195,6 +195,31 @@ pricing_lookup = {
         "cache_read": 1,
         "cache_write": 1,
     },
+    # XAI
+    "grok-beta": {
+        "input": (5.0 / 1_000_000),
+        "output": (15.0 / 1_000_000),
+        "cache_read": 1,
+        "cache_write": 1,
+    },
+    "grok-vision-beta": {
+        "input": (5.0 / 1_000_000),
+        "output": (15.0 / 1_000_000),
+        "cache_read": 1,
+        "cache_write": 1,
+    },
+    "grok-2-vision": {
+        "input": (2.0 / 1_000_000),
+        "output": (10.0 / 1_000_000),
+        "cache_read": 1,
+        "cache_write": 1,
+    },
+    "grok-2": {
+        "input": (2.0 / 1_000_000),
+        "output": (10.0 / 1_000_000),
+        "cache_read": 1,
+        "cache_write": 1,
+    },
 }
 
 
@@ -213,28 +238,33 @@ def mk_usage_metadata() -> dict[str, int | float]:
     }
 
 
-def get_api_call_cost(
-    llm_config: LlmConfig, usage_metadata: dict[str, int | float], batch_pricing: bool = False
-) -> float:
-    """Get API call cost"""
-    if llm_config.provider in [LlmProvider.OLLAMA, LlmProvider.GITHUB, LlmProvider.GROQ]:
-        return 0
-    batch_multiplier = 0.5 if batch_pricing else 1
-    model_name = ""
-    if llm_config.model_name not in pricing_lookup:
+def get_api_cost_model_name(model_name: str = "") -> str:
+    """Get API cost model name"""
+
+    if model_name not in pricing_lookup:
         keys = pricing_lookup.keys()
         keys = sorted(keys, key=len, reverse=True)
         for key in keys:
-            if key.endswith(llm_config.model_name) or llm_config.model_name.endswith(key):
+            if key.endswith(model_name) or model_name.endswith(key):
                 model_name = key
                 break
         if not model_name:
             for key in keys:
-                if key.startswith(llm_config.model_name) or llm_config.model_name.startswith(key):
+                if key.startswith(model_name) or model_name.startswith(key):
                     model_name = key
                     break
-    else:
-        model_name = llm_config.model_name
+
+    return model_name
+
+
+def get_api_call_cost(
+    llm_config: LlmConfig, usage_metadata: dict[str, int | float], batch_pricing: bool = False
+) -> float:
+    """Get API call cost"""
+    if llm_config.provider in [LlmProvider.OLLAMA, LlmProvider.LLAMACPP, LlmProvider.GROQ, LlmProvider.GITHUB]:
+        return 0
+    batch_multiplier = 0.5 if batch_pricing else 1
+    model_name = get_api_cost_model_name(llm_config.model_name)
 
     if model_name in pricing_lookup:
         return (
@@ -278,8 +308,7 @@ def accumulate_cost(response: object | dict, usage_metadata: dict[str, int | flo
 
 
 def show_llm_cost(
-    llm_config: LlmConfig,
-    usage_metadata: dict[str, int | float],
+    usage_metadata: dict[str, dict[str, int | float]],
     *,
     show_pricing: PricingDisplay = PricingDisplay.PRICE,
     console: Console | None = None,
@@ -290,18 +319,23 @@ def show_llm_cost(
     if not console:
         console = Console(stderr=True)
 
-    if "total_cost" in usage_metadata:
-        cost = usage_metadata["total_cost"]
+    grand_total: float = 0.0
+    if show_pricing == PricingDisplay.PRICE:
+        for m, u in usage_metadata.items():
+            if "total_cost" in u:
+                grand_total += u["total_cost"]
     else:
-        cost = get_api_call_cost(llm_config, usage_metadata)
-
-    if show_pricing == PricingDisplay.DETAILS:
-        console.print(
-            Panel.fit(
-                Pretty(usage_metadata),
-                title=f"Cost ${cost:.4f}",
-                border_style="bold",
+        for m, u in usage_metadata.items():
+            cost = 0.0
+            if "total_cost" in u:
+                cost = u["total_cost"]
+                grand_total += cost
+            model_name = get_api_cost_model_name(m)
+            console.print(
+                Panel.fit(
+                    Pretty(u),
+                    title=f"Model: [green]{model_name}[/green] Cost: [yellow]${cost:.4f}",
+                    border_style="bold",
+                )
             )
-        )
-    else:
-        console.print(f"Cost ${cost:.4f}")
+    console.print(f"Total Cost [yellow]${grand_total:.4f}")

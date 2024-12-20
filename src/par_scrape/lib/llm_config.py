@@ -3,21 +3,23 @@
 from __future__ import annotations
 
 import os
+import threading
+import uuid
 import warnings
 from dataclasses import dataclass
 from enum import Enum
 
-import boto3
-from botocore.config import Config
-
 from langchain._api import LangChainDeprecationWarning
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel, BaseLanguageModel
-
+from langchain_core.runnables import RunnableConfig
 from pydantic import SecretStr
+from rich.console import Console
 
 # from langchain_experimental import
 from .llm_providers import LlmProvider, is_provider_api_key_set, provider_base_urls
+
+console = Console(stderr=True)
 
 warnings.simplefilter("ignore", category=LangChainDeprecationWarning)
 
@@ -99,8 +101,8 @@ class LlmConfig:
     """Sets the random number seed to use for generation. Setting this
     to a specific number will make the model generate the same text for
     the same prompt."""
-    max_tokens: int | None = None
-    """Maximum number of tokens to generate."""
+    env_prefix: str = "PARAI"
+    """Prefix to use for environment variables"""
 
     def to_json(self) -> dict:
         """Return dict for use with json"""
@@ -125,7 +127,7 @@ class LlmConfig:
             "top_k": self.top_k,
             "top_p": self.top_p,
             "seed": self.seed,
-            "max_tokens": self.max_tokens,
+            "env_prefix": self.env_prefix,
         }
 
     @staticmethod
@@ -156,7 +158,14 @@ class LlmConfig:
             top_k=self.top_k,
             top_p=self.top_p,
             seed=self.seed,
-            max_tokens=self.max_tokens,
+            env_prefix=self.env_prefix,
+        )
+
+    def gen_runnable_config(self) -> RunnableConfig:
+        config_id = str(uuid.uuid4())
+        return RunnableConfig(
+            metadata=self.to_json() | {"config_id": config_id},
+            tags=[f"config_id={config_id}", f"provider={self.provider.value}", f"model={self.model_name}"],
         )
 
     def _build_ollama_llm(self) -> BaseLanguageModel | BaseChatModel | Embeddings:
@@ -164,13 +173,13 @@ class LlmConfig:
         if self.provider != LlmProvider.OLLAMA:
             raise ValueError(f"LLM provider is'{self.provider}' but OLLAMA requested.")
 
-        from langchain_ollama import OllamaLLM, ChatOllama, OllamaEmbeddings
+        from langchain_ollama import ChatOllama, OllamaEmbeddings, OllamaLLM
 
         if self.mode == LlmMode.BASE:
             return OllamaLLM(
                 model=self.model_name,
                 temperature=self.temperature,
-                base_url=self.base_url or OLLAMA_HOST,
+                base_url=self.base_url or OLLAMA_HOST or provider_base_urls[self.provider],
                 client_kwargs={"timeout": self.timeout},
                 num_ctx=self.num_ctx or None,
                 num_predict=self.num_predict,
@@ -187,7 +196,7 @@ class LlmConfig:
             return ChatOllama(
                 model=self.model_name,
                 temperature=self.temperature,
-                base_url=self.base_url or OLLAMA_HOST,
+                base_url=self.base_url or OLLAMA_HOST or provider_base_urls[self.provider],
                 client_kwargs={"timeout": self.timeout},
                 num_ctx=self.num_ctx or None,
                 num_predict=self.num_predict,
@@ -200,10 +209,11 @@ class LlmConfig:
                 top_k=self.top_k,
                 top_p=self.top_p,
                 seed=self.seed,
+                disable_streaming=not self.streaming,
             )
         if self.mode == LlmMode.EMBEDDINGS:
             return OllamaEmbeddings(
-                base_url=self.base_url or OLLAMA_HOST,
+                base_url=self.base_url or OLLAMA_HOST or provider_base_urls[self.provider],
                 model=self.model_name,
             )
 
@@ -218,7 +228,7 @@ class LlmConfig:
         else:
             api_key = SecretStr(os.environ.get("OPENAI_API_KEY", ""))
 
-        from langchain_openai import OpenAI, ChatOpenAI, OpenAIEmbeddings
+        from langchain_openai import ChatOpenAI, OpenAI, OpenAIEmbeddings
 
         if self.mode == LlmMode.BASE:
             return OpenAI(
@@ -231,7 +241,7 @@ class LlmConfig:
                 frequency_penalty=self.repeat_penalty or 0,
                 top_p=self.top_p or 1,
                 seed=self.seed,
-                max_tokens=self.max_tokens or 256,
+                max_tokens=self.num_ctx or -1,
             )
         if self.mode == LlmMode.CHAT:
             return ChatOpenAI(
@@ -244,7 +254,8 @@ class LlmConfig:
                 timeout=self.timeout,
                 top_p=self.top_p,
                 seed=self.seed,
-                max_tokens=self.max_tokens,  # type: ignore
+                max_tokens=self.num_ctx,  # type: ignore
+                disable_streaming=not self.streaming,
             )
         if self.mode == LlmMode.EMBEDDINGS:
             return OpenAIEmbeddings(
@@ -272,10 +283,32 @@ class LlmConfig:
                 base_url=self.base_url,
                 timeout=self.timeout,
                 streaming=self.streaming,
-                max_tokens=self.max_tokens,
+                max_tokens=self.num_ctx,
+                disable_streaming=not self.streaming,
             )  # type: ignore
         if self.mode == LlmMode.EMBEDDINGS:
             raise ValueError(f"{self.provider} provider does not support mode {self.mode}")
+
+        raise ValueError(f"Invalid LLM mode '{self.mode}'")
+
+    def _build_xai_llm(self) -> BaseLanguageModel | BaseChatModel | Embeddings:
+        """Build the XAI LLM."""
+        if self.provider != LlmProvider.XAI:
+            raise ValueError(f"LLM provider is'{self.provider}' but XAI requested.")
+        if self.mode in (LlmMode.BASE, LlmMode.EMBEDDINGS):
+            raise ValueError(f"{self.provider} provider does not support mode {self.mode}")
+
+        from langchain_xai import ChatXAI
+
+        if self.mode == LlmMode.CHAT:
+            return ChatXAI(
+                model=self.model_name,
+                temperature=self.temperature,
+                timeout=self.timeout,
+                streaming=self.streaming,
+                max_tokens=self.num_ctx,
+                disable_streaming=not self.streaming,
+            )  # type: ignore
 
         raise ValueError(f"Invalid LLM mode '{self.mode}'")
 
@@ -284,13 +317,14 @@ class LlmConfig:
         if self.provider != LlmProvider.ANTHROPIC:
             raise ValueError(f"LLM provider is'{self.provider}' but ANTHROPIC requested.")
 
+        if self.mode in (LlmMode.BASE, LlmMode.EMBEDDINGS):
+            raise ValueError(f"{self.provider} provider does not support mode {self.mode}")
+
         from langchain_anthropic import ChatAnthropic
 
-        if self.mode == LlmMode.BASE:
-            raise ValueError(f"{self.provider} provider does not support mode {self.mode}")
         if self.mode == LlmMode.CHAT:
-            return ChatAnthropic(  # pyright: ignore [reportCallIssue]
-                model=self.model_name,  # pyright: ignore [reportCallIssue]
+            return ChatAnthropic(
+                model=self.model_name,  # type: ignore
                 temperature=self.temperature,
                 streaming=self.streaming,
                 base_url=self.base_url,
@@ -299,10 +333,9 @@ class LlmConfig:
                 top_k=self.top_k,
                 top_p=self.top_p,
                 max_tokens_to_sample=self.num_predict or 1024,
-                max_tokens=self.max_tokens,  # pyright: ignore [reportCallIssue]
-            )
-        if self.mode == LlmMode.EMBEDDINGS:
-            raise ValueError(f"{self.provider} provider does not support mode {self.mode}")
+                disable_streaming=not self.streaming,
+                max_tokens=self.num_ctx or None,  # type: ignore
+            )  # type: ignore
 
         raise ValueError(f"Invalid LLM mode '{self.mode}'")
 
@@ -316,8 +349,8 @@ class LlmConfig:
             ChatGoogleGenerativeAI,
             GoogleGenerativeAI,
             GoogleGenerativeAIEmbeddings,
-            HarmCategory,
             HarmBlockThreshold,
+            HarmCategory,
         )
 
         if self.mode == LlmMode.BASE:
@@ -327,7 +360,7 @@ class LlmConfig:
                 timeout=self.timeout,
                 top_k=self.top_k,
                 top_p=self.top_p,
-                max_tokens=self.max_tokens,
+                max_tokens=self.num_ctx,
                 safety_settings={HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE},
             )
         if self.mode == LlmMode.CHAT:
@@ -337,8 +370,9 @@ class LlmConfig:
                 timeout=self.timeout,
                 top_k=self.top_k,
                 top_p=self.top_p,
-                max_tokens=self.max_tokens,
+                max_tokens=self.num_ctx,
                 safety_settings={HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE},
+                disable_streaming=not self.streaming,
             )
         if self.mode == LlmMode.EMBEDDINGS:
             return GoogleGenerativeAIEmbeddings(
@@ -352,8 +386,9 @@ class LlmConfig:
         """Build the BEDROCK LLM."""
         if self.provider != LlmProvider.BEDROCK:
             raise ValueError(f"LLM provider is'{self.provider}' but BEDROCK requested.")
-
-        from langchain_aws import BedrockLLM, ChatBedrockConverse, BedrockEmbeddings
+        import boto3
+        from botocore.config import Config
+        from langchain_aws import BedrockEmbeddings, BedrockLLM, ChatBedrockConverse
 
         session = boto3.Session(
             region_name=os.environ.get("AWS_REGION", "us-east-1"),
@@ -373,19 +408,20 @@ class LlmConfig:
             return BedrockLLM(
                 client=bedrock_client,
                 model=self.model_name,
-                temperature=self.temperature,
-                streaming=self.streaming,
-                max_tokens=self.max_tokens,
                 endpoint_url=self.base_url,
+                temperature=self.temperature,
+                max_tokens=self.num_ctx,
+                streaming=self.streaming,
             )
         if self.mode == LlmMode.CHAT:
             return ChatBedrockConverse(
                 client=bedrock_client,
                 model=self.model_name,
+                endpoint_url=self.base_url,  # type: ignore
                 temperature=self.temperature,
-                max_tokens=self.max_tokens,
+                max_tokens=self.num_ctx or None,
                 top_p=self.top_p,
-                endpoint_url=self.base_url, # type: ignore
+                disable_streaming=not self.streaming,
             )
         if self.mode == LlmMode.EMBEDDINGS:
             return BedrockEmbeddings(
@@ -405,6 +441,8 @@ class LlmConfig:
             return self._build_openai_llm()
         if self.provider == LlmProvider.GROQ:
             return self._build_groq_llm()
+        if self.provider == LlmProvider.XAI:
+            return self._build_xai_llm()
         if self.provider == LlmProvider.ANTHROPIC:
             return self._build_anthropic_llm()
         if self.provider == LlmProvider.GOOGLE:
@@ -416,15 +454,27 @@ class LlmConfig:
 
     def build_llm_model(self) -> BaseLanguageModel:
         """Build the LLM model."""
+        if self.model_name.startswith("o1"):
+            self.temperature = 1
         llm = self._build_llm()
         if isinstance(llm, BaseLanguageModel):
+            config = self.gen_runnable_config()
+            llm.name = config["metadata"]["config_id"] if "metadata" in config else None
+            llm_run_manager.register_id(config, self)
             return llm
         raise ValueError(f"LLM provider '{self.provider}' does not support base mode.")
 
     def build_chat_model(self) -> BaseChatModel:
         """Build the chat model."""
+        if self.model_name.startswith("o1"):
+            self.temperature = 1
+            self.streaming = False
+
         llm = self._build_llm()
         if isinstance(llm, BaseChatModel):
+            config = self.gen_runnable_config()
+            llm.name = config["metadata"]["config_id"] if "metadata" in config else None
+            llm_run_manager.register_id(config, self)
             return llm
         raise ValueError(f"LLM provider '{self.provider}' does not support chat mode.")
 
@@ -438,3 +488,102 @@ class LlmConfig:
     def is_api_key_set(self) -> bool:
         """Check if API key is set for the provider."""
         return is_provider_api_key_set(self.provider)
+
+    def set_env(self) -> LlmConfig:
+        """Update environment variables to match the LLM configuration."""
+        os.environ[f"{self.env_prefix}_AI_PROVIDER"] = self.provider.value
+        os.environ[f"{self.env_prefix}_MODEL"] = self.model_name
+        if self.base_url:
+            os.environ[f"{self.env_prefix}_AI_BASE_URL"] = self.base_url
+        os.environ[f"{self.env_prefix}_TEMPERATURE"] = str(self.temperature)
+        if self.user_agent_appid:
+            os.environ[f"{self.env_prefix}_USER_AGENT_APPID"] = self.user_agent_appid
+        os.environ[f"{self.env_prefix}_STREAMING"] = str(self.streaming)
+        if self.num_ctx is not None:
+            os.environ[f"{self.env_prefix}_NUM_CTX"] = str(self.num_ctx)
+        if self.num_predict is not None:
+            os.environ[f"{self.env_prefix}_NUM_PREDICT"] = str(self.num_predict)
+        if self.repeat_last_n is not None:
+            os.environ[f"{self.env_prefix}_REPEAT_LAST_N"] = str(self.repeat_last_n)
+        if self.repeat_penalty is not None:
+            os.environ[f"{self.env_prefix}_REPEAT_PENALTY"] = str(self.repeat_penalty)
+        if self.mirostat is not None:
+            os.environ[f"{self.env_prefix}_MIROSTAT"] = str(self.mirostat)
+        if self.mirostat_eta is not None:
+            os.environ[f"{self.env_prefix}_MIROSTAT_ETA"] = str(self.mirostat_eta)
+        if self.mirostat_tau is not None:
+            os.environ[f"{self.env_prefix}_MIROSTAT_TAU"] = str(self.mirostat_tau)
+        if self.tfs_z is not None:
+            os.environ[f"{self.env_prefix}_TFS_Z"] = str(self.tfs_z)
+        if self.top_k is not None:
+            os.environ[f"{self.env_prefix}_TOP_K"] = str(self.top_k)
+        if self.top_p is not None:
+            os.environ[f"{self.env_prefix}_TOP_P"] = str(self.top_p)
+        if self.seed is not None:
+            os.environ[f"{self.env_prefix}_SEED"] = str(self.seed)
+        if self.timeout is not None:
+            os.environ[f"{self.env_prefix}_TIMEOUT"] = str(self.timeout)
+
+        return self
+
+
+class LlmRunManager:
+    """LLM run manager."""
+
+    _lock: threading.Lock = threading.Lock()
+    _id_to_config: dict[str, tuple[RunnableConfig, LlmConfig]] = {}
+
+    def register_id(self, config: RunnableConfig, llmConfig: LlmConfig) -> None:
+        """Register runnable config by run id."""
+        if "metadata" not in config or "config_id" not in config["metadata"]:
+            raise ValueError("Runnable config must have a config_id in metadata")
+        with self._lock:
+            self._id_to_config[config["metadata"]["config_id"]] = (config, llmConfig)
+
+    def get_config(self, config_id: str) -> tuple[RunnableConfig, LlmConfig] | None:
+        """Get runnable config by config id."""
+        with self._lock:
+            return self._id_to_config.get(config_id)
+
+    def get_runnable_config(self, config_id: str | None) -> RunnableConfig | None:
+        """Get runnable config by config id."""
+        if not config_id:
+            return None
+        with self._lock:
+            config = self._id_to_config.get(config_id)
+            if not config:
+                return None
+            return config[0]
+
+    def get_runnable_config_by_model(self, model_name: str) -> RunnableConfig | None:
+        """Get runnable config by model name."""
+        if not model_name:
+            return None
+        with self._lock:
+            for item in self._id_to_config.values():
+                if item[1].model_name == model_name:
+                    return item[0]
+            return None
+
+    def get_runnable_config_by_llm_config(self, llm_config: LlmConfig) -> RunnableConfig | None:
+        """Get runnable config by llm config."""
+        if not llm_config:
+            return None
+        with self._lock:
+            for item in self._id_to_config.values():
+                if item[1].model_name == llm_config.model_name:
+                    return item[0]
+            return None
+
+    def get_provider_and_model(self, config_id: str | None) -> tuple[str, str] | None:
+        """Get provider and model by run id."""
+        if not config_id:
+            return None
+        with self._lock:
+            config = self._id_to_config.get(config_id)
+            if not config:
+                return None
+            return config[1].provider, config[1].model_name
+
+
+llm_run_manager = LlmRunManager()

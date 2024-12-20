@@ -3,11 +3,11 @@
 import os
 import shutil
 import time
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
-from contextlib import nullcontext
 
 import typer
 from dotenv import load_dotenv
@@ -15,29 +15,30 @@ from rich.panel import Panel
 from rich.text import Text
 
 from par_scrape.enums import CleanupType, ScraperChoice, WaitType
+from par_scrape.fetch_html import (
+    fetch_html_playwright,
+    fetch_html_selenium,
+    html_to_markdown_with_readability,
+)
 from par_scrape.lib.llm_config import LlmConfig
 from par_scrape.lib.output_utils import DisplayOutputFormat, display_formatted_output
-from par_scrape.lib.pricing_lookup import show_llm_cost, PricingDisplay
+from par_scrape.lib.pricing_lookup import PricingDisplay, show_llm_cost
 from par_scrape.lib.provider_cb_info import get_parai_callback
 from par_scrape.scrape_data import (
-    save_raw_data,
     create_dynamic_listing_model,
     create_listings_container_model,
     format_data,
     save_formatted_data,
+    save_raw_data,
 )
-from par_scrape.fetch_html import (
-    fetch_html_selenium,
-    fetch_html_playwright,
-    html_to_markdown_with_readability,
-)
-from .utils import console
-from . import __version__, __application_title__
+
+from . import __application_title__, __version__
 from .lib.llm_providers import (
     LlmProvider,
     provider_default_models,
     provider_env_key_names,
 )
+from .utils import console
 
 new_env_path = Path("~/.par_scrape.env").expanduser()
 old_env_path = Path("~/.par-scrape.env").expanduser()
@@ -70,12 +71,7 @@ def main(
     fields: Annotated[
         list[str],
         typer.Option("--fields", "-f", help="Fields to extract from the webpage"),
-    ] = [
-        "Model",
-        "Pricing Input",
-        "Pricing Output",
-        "Cache Price"
-    ],
+    ] = ["Model", "Pricing Input", "Pricing Output", "Cache Price"],
     scraper: Annotated[
         ScraperChoice,
         typer.Option(
@@ -289,7 +285,7 @@ def main(
                     save_raw_data(markdown, run_name, output_folder)
 
                 llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0, base_url=ai_base_url)
-                with get_parai_callback(llm_config) as cb:
+                with get_parai_callback() as cb:
                     # Create the dynamic listing model
                     status.update("[bold cyan]Creating dynamic models...")
                     dynamic_listing_model = create_dynamic_listing_model(fields)
@@ -323,7 +319,7 @@ def main(
             duration = time.time() - start_time
             console.print(Panel.fit(f"Done in {duration:.2f} seconds."))
             # Display price summary
-            show_llm_cost(llm_config, cb.usage_metadata, show_pricing=pricing)
+            show_llm_cost(cb.usage_metadata, show_pricing=pricing)
 
         except Exception as e:  # pylint: disable=broad-except
             # print(e)

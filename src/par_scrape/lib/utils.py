@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import glob
 import hashlib
+import html
 import io
 import math
 import os
 import random
 import re
+import select
+import shlex
 import string
 import subprocess
 import sys
@@ -22,12 +26,12 @@ from decimal import Decimal
 from io import StringIO
 from os import listdir
 from os.path import isfile, join
+from pathlib import Path
 from re import Match, Pattern
 from typing import Any
 
-import select
-from markdownify import MarkdownConverter
 from bs4 import BeautifulSoup
+from markdownify import MarkdownConverter
 from rich.console import Console
 
 console = Console(stderr=True)
@@ -137,7 +141,7 @@ def to_class_case(snake_str: str) -> str:
     return "".join(x.title() for x in components[0:])
 
 
-def get_files(path: str, ext: str = "") -> list[str]:
+def get_files(path: str | Path | os.PathLike, ext: str = "") -> list[str]:
     """Return list of file names in alphabetical order inside of provided path non-recursively.
     Omitting files not ending with ext."""
     ret = [f for f in listdir(path) if isfile(join(path, f)) and (not ext or not f.endswith(ext))]
@@ -243,17 +247,29 @@ def is_valid_uuid_v4(value: str) -> bool:
         return False
 
 
-def parse_csv_text(csv_data: StringIO) -> list[dict]:
+def parse_csv_text(csv_data: StringIO, has_header: bool = True) -> list[dict]:
     """
     Reads in a CSV file as text and returns it as a list of dictionaries.
 
     Args:
             csv_data (StringIO): The CSV file as text.
+            has_header (bool): Whether the CSV has a header row. Defaults to True.
 
     Returns:
             list[dict]: The CSV data as a list of dictionaries.
+
+    Raises:
+            csv.Error: If there's an issue parsing the CSV data.
     """
-    return list(csv.DictReader(csv_data))
+    try:
+        if has_header:
+            return list(csv.DictReader(csv_data))
+        else:
+            reader = csv.reader(csv_data)
+            headers = next(reader)
+            return [dict(zip(headers, row)) for row in reader]
+    except csv.Error as e:
+        raise csv.Error(f"Error parsing CSV data: {str(e)}")
 
 
 def read_text_file_to_stringio(file_path: str, encoding: str = "utf-8") -> StringIO:
@@ -281,8 +297,7 @@ def md5_hash(data: str) -> str:
     Returns:
             str: The md5 hash of the input data.
     """
-    md5 = hashlib.md5()
-    md5.update(data.encode())
+    md5 = hashlib.md5(data.encode("utf-8"))
     return md5.hexdigest()
 
 
@@ -296,8 +311,7 @@ def sha1_hash(data: str) -> str:
     Returns:
             str: The SHA1 hash of the input data.
     """
-    sha1 = hashlib.sha1()
-    sha1.update(data.encode())
+    sha1 = hashlib.sha1(data.encode("utf-8"))
     return sha1.hexdigest()
 
 
@@ -311,8 +325,7 @@ def sha256_hash(data: str) -> str:
     Returns:
             str: The SHA256 hash of the input data.
     """
-    sha256 = hashlib.sha256()
-    sha256.update(data.encode())
+    sha256 = hashlib.sha256(data.encode("utf-8"))
     return sha256.hexdigest()
 
 
@@ -437,7 +450,9 @@ def hash_list_by_key(data: list[dict], id_key: str = "message_id") -> dict:
 def run_shell_cmd(cmd: str) -> str | None:
     """Run a command and return the output."""
     try:
-        return subprocess.run(cmd, shell=True, capture_output=True, check=True, encoding="utf-8").stdout.strip()
+        return subprocess.run(
+            shlex.split(cmd), shell=False, capture_output=True, check=True, encoding="utf-8"
+        ).stdout.strip()
     except Exception as _:
         return None
 
@@ -519,3 +534,91 @@ def suppress_output():
         finally:
             sys.stdout = old_stdout
             sys.stderr = old_stderr
+
+
+code_python_file_globs: list[str | Path] = [
+    "./**/*.py",
+    "./**/*.ipynb",
+]
+
+code_js_file_globs: list[str | Path] = [
+    "./**/*.js",
+    "./**/*.ts",
+]
+
+code_frontend_file_globs: list[str | Path] = [
+    "./**/*.jsx",
+    "./**/*.tsx",
+    "./**/*.vue",
+    "./**/*.svelte",
+    "./**/*.html",
+    "./**/*.css",
+]
+
+code_rust_file_globs: list[str | Path] = [
+    "./**/*.rs",
+    "./**/*.toml",
+]
+
+code_java_file_globs: list[str | Path] = [
+    "./**/*.java",
+    "./**/*.gradle",
+    "./**/*.gradle.kts",
+    "./**/*.kt",
+    "./**/*.kts",
+]
+
+
+def gather_files_for_context(file_patterns: list[str | Path], max_context_length: int = 0) -> str:
+    """
+    Gather files for context.
+
+    Args:
+        file_patterns (list[str | Path]): List of file glob patterns to match
+        max_context_length (int, optional): Maximum context length. Defaults to 0 (no limit).
+
+    Returns:
+        str: xml formatted list of files and their contents
+    """
+    files = []
+    for pattern in file_patterns:
+        try:
+            if isinstance(pattern, Path):
+                pattern = pattern.as_posix()
+            files += glob.glob(pattern, recursive=True, include_hidden=False)
+        except Exception as _:
+            pass
+
+    if not files:
+        return "<files>\n</files>\n"
+
+    if max_context_length < 0:
+        max_context_length = 0
+    doc = StringIO()
+    doc.write("<files>\n")
+    i: int = 0
+    curr_len = 17
+    for file in files:
+        try:
+            f = Path(file)
+            if f.is_file():
+                f_path = str(f.as_posix())
+                if (
+                    "/.git/" in f_path
+                    or "/.venv/" in f_path
+                    or "/venv/" in f_path
+                    or "/node_modules/" in f_path
+                    or "/__pycache__/" in f_path
+                ):
+                    continue
+                st = f"""<file index="{i}">\n<source>{html.escape(f.as_posix(), quote=True)}</source>\n<file-content>{html.escape(f.read_text(encoding='utf-8'), quote=True)}</file-content>\n</file>\n"""
+                if max_context_length and curr_len + len(st) > max_context_length:
+                    break
+                doc.write(st)
+                curr_len += len(st)
+                i += 1
+        except Exception as _:
+            pass
+
+    doc.write("</files>\n")
+    return doc.getvalue()

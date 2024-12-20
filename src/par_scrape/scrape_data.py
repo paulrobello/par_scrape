@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 from langchain_anthropic import ChatAnthropic
-from pydantic import BaseModel, create_model, ConfigDict
+from pydantic import BaseModel, ConfigDict, create_model
 from rich.panel import Panel
 
-from par_scrape.utils import console
-from par_scrape.lib.llm_config import LlmConfig
+from .lib.llm_config import LlmConfig
+from .utils import console
 
 
 def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
@@ -112,13 +112,9 @@ def format_data(
             ("system", system_message),
             (
                 "user",
-                [
-                    {
-                        "type": "text",
-                        "text": user_message
-                    }
-                ],
-            ),        ]
+                [{"type": "text", "text": user_message}],
+            ),
+        ]
 
         if prompt_cache and isinstance(chat_model, ChatAnthropic):
             history[1][1][0]["cache_control"] = {"type": "ephemeral"}  # type: ignore
