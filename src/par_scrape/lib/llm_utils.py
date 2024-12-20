@@ -138,6 +138,7 @@ def summarize_content(content: str, llm: BaseChatModel) -> str:
             [
                 SystemMessage(content=summarize_content_instructions),
                 HumanMessage(content=content),
-            ], config=llm_run_manager.get_runnable_config(llm.name)
+            ],
+            config=llm_run_manager.get_runnable_config(llm.name),
         ).content
     )
