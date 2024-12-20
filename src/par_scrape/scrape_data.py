@@ -9,7 +9,7 @@ from langchain_anthropic import ChatAnthropic
 from pydantic import BaseModel, ConfigDict, create_model
 from rich.panel import Panel
 
-from .lib.llm_config import LlmConfig
+from .lib.llm_config import LlmConfig, llm_run_manager
 from .utils import console
 
 
@@ -119,7 +119,7 @@ def format_data(
         if prompt_cache and isinstance(chat_model, ChatAnthropic):
             history[1][1][0]["cache_control"] = {"type": "ephemeral"}  # type: ignore
 
-        data = structure_model.invoke(history)  # type: ignore
+        data = structure_model.invoke(history, config=llm_run_manager.get_runnable_config(chat_model.name))  # type: ignore
         if isinstance(data, BaseModel):
             return data
         console.print(data)

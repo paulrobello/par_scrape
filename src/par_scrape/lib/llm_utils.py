@@ -7,7 +7,7 @@ import os
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from .llm_config import LlmConfig
+from .llm_config import LlmConfig, llm_run_manager
 from .llm_providers import LlmProvider, provider_base_urls, provider_default_models, provider_env_key_names
 
 
@@ -123,7 +123,7 @@ def summarize_content(content: str, llm: BaseChatModel) -> str:
     Returns:
         str: Summary
     """
-    summarize_content_instructions = """Your goal is to generate a summary of the content.
+    summarize_content_instructions = """Your goal is to generate a summary of the user provided content.
 
     Your response should include the following:
     - Title
@@ -138,6 +138,6 @@ def summarize_content(content: str, llm: BaseChatModel) -> str:
             [
                 SystemMessage(content=summarize_content_instructions),
                 HumanMessage(content=content),
-            ]
+            ], config=llm_run_manager.get_runnable_config(llm.name)
         ).content
     )
