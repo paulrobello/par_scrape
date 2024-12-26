@@ -6,11 +6,10 @@ from pathlib import Path
 
 import pandas as pd
 from langchain_anthropic import ChatAnthropic
+from par_ai_core.llm_config import LlmConfig, llm_run_manager
+from par_ai_core.par_logging import console_out
 from pydantic import BaseModel, ConfigDict, create_model
 from rich.panel import Panel
-
-from .lib.llm_config import LlmConfig, llm_run_manager
-from .utils import console
 
 
 def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
@@ -32,7 +31,7 @@ def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
     raw_output_path = os.path.join(output_folder, f"rawData_{run_name}.md")
     with open(raw_output_path, "w", encoding="utf-8") as f:
         f.write(raw_data)
-    console.print(Panel(f"Raw data saved to [bold green]{raw_output_path}[/bold green]"))
+    console_out.print(Panel(f"Raw data saved to [bold green]{raw_output_path}[/bold green]"))
     return raw_output_path
 
 
@@ -97,7 +96,7 @@ def format_data(
     try:
         system_message = extraction_prompt.read_text(encoding="utf-8")
     except FileNotFoundError:
-        console.print(f"[bold red]Extraction prompt file not found: {extraction_prompt}[/bold red]")
+        console_out.print(f"[bold red]Extraction prompt file not found: {extraction_prompt}[/bold red]")
         raise
 
     user_message = f"Extract the following information from the provided text:\nPage content:\n\n{data}"
@@ -122,10 +121,10 @@ def format_data(
         data = structure_model.invoke(history, config=llm_run_manager.get_runnable_config(chat_model.name))  # type: ignore
         if isinstance(data, BaseModel):
             return data
-        console.print(data)
+        console_out.print(data)
         raise ValueError("Error in API call. Did not return a Pydantic BaseModel")
     except Exception as e:  # pylint: disable=broad-exception-caught
-        console.print(f"[bold red]Error in API call or parsing response:[/bold red] {str(e)}")
+        console_out.print(f"[bold red]Error in API call or parsing response:[/bold red] {str(e)}")
         return dynamic_listings_container(listings=[])
 
 
@@ -155,7 +154,7 @@ def save_formatted_data(
     json_output_path = output_folder / f"sorted_data_{run_name}.json"
     json_output_path.write_text(json.dumps(formatted_data_dict, indent=4), encoding="utf-8")
 
-    console.print(Panel(f"Formatted data saved to JSON at [bold green]{json_output_path}[/bold green]"))
+    console_out.print(Panel(f"Formatted data saved to JSON at [bold green]{json_output_path}[/bold green]"))
     file_paths["json"] = json_output_path
 
     # Prepare data for DataFrame
@@ -173,24 +172,24 @@ def save_formatted_data(
         # Save the DataFrame to an Excel file
         excel_output_path = output_folder / f"sorted_data_{run_name}.xlsx"
         df.to_excel(excel_output_path, index=False)
-        console.print(Panel(f"Formatted data saved to Excel at [bold green]{excel_output_path}[/bold green]"))
+        console_out.print(Panel(f"Formatted data saved to Excel at [bold green]{excel_output_path}[/bold green]"))
         file_paths["excel"] = excel_output_path
 
         # Save the DataFrame to a CSV file
         csv_output_path = output_folder / f"sorted_data_{run_name}.csv"
         df.to_csv(csv_output_path, index=False)
-        console.print(Panel(f"Formatted data saved to CSV at [bold green]{csv_output_path}[/bold green]"))
+        console_out.print(Panel(f"Formatted data saved to CSV at [bold green]{csv_output_path}[/bold green]"))
         file_paths["csv"] = csv_output_path
 
         # Save the DataFrame as a Markdown table
         markdown_output_path = output_folder / f"sorted_data_{run_name}.md"
         markdown_output_path.write_text(df.to_markdown(index=False) or "", encoding="utf-8")
-        console.print(
+        console_out.print(
             Panel(f"Formatted data saved as Markdown table at [bold green]{markdown_output_path}[/bold green]")
         )
         file_paths["md"] = markdown_output_path
 
         return df, file_paths
     except Exception as e:  # pylint: disable=broad-except
-        console.print(f"[bold red]Error creating DataFrame or saving files:[/bold red] {str(e)}")
+        console_out.print(f"[bold red]Error creating DataFrame or saving files:[/bold red] {str(e)}")
         return None, {}

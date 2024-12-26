@@ -1,10 +1,6 @@
 """Utility functions for par_scrape."""
 
 import tiktoken
-from rich.console import Console
-
-# Initialize rich console
-console = Console()
 
 
 def estimate_tokens(text: str) -> int:

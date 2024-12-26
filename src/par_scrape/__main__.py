@@ -11,6 +11,16 @@ from uuid import uuid4
 
 import typer
 from dotenv import load_dotenv
+from par_ai_core.llm_config import LlmConfig
+from par_ai_core.llm_providers import (
+    LlmProvider,
+    provider_default_models,
+    provider_env_key_names,
+)
+from par_ai_core.output_utils import DisplayOutputFormat, display_formatted_output
+from par_ai_core.par_logging import console_out
+from par_ai_core.pricing_lookup import PricingDisplay, show_llm_cost
+from par_ai_core.provider_cb_info import get_parai_callback
 from rich.panel import Panel
 from rich.text import Text
 
@@ -20,10 +30,6 @@ from par_scrape.fetch_html import (
     fetch_html_selenium,
     html_to_markdown_with_readability,
 )
-from par_scrape.lib.llm_config import LlmConfig
-from par_scrape.lib.output_utils import DisplayOutputFormat, display_formatted_output
-from par_scrape.lib.pricing_lookup import PricingDisplay, show_llm_cost
-from par_scrape.lib.provider_cb_info import get_parai_callback
 from par_scrape.scrape_data import (
     create_dynamic_listing_model,
     create_listings_container_model,
@@ -33,12 +39,6 @@ from par_scrape.scrape_data import (
 )
 
 from . import __application_title__, __version__
-from .lib.llm_providers import (
-    LlmProvider,
-    provider_default_models,
-    provider_env_key_names,
-)
-from .utils import console
 
 new_env_path = Path("~/.par_scrape.env").expanduser()
 old_env_path = Path("~/.par-scrape.env").expanduser()
@@ -46,7 +46,7 @@ if old_env_path.exists():
     if new_env_path.exists():
         old_env_path.unlink()
     else:
-        console.print(f"[bold yellow]Renaming {old_env_path} to {new_env_path}")
+        console_out.print(f"[bold yellow]Renaming {old_env_path} to {new_env_path}")
         old_env_path.rename(new_env_path)
 
 # Load the .env file from the project folder
@@ -174,18 +174,18 @@ def main(
     if ai_provider not in [LlmProvider.OLLAMA, LlmProvider.BEDROCK]:
         key_name = provider_env_key_names[ai_provider]
         if not os.environ.get(key_name):
-            console.print(f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]")
+            console_out.print(f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]")
             raise typer.Exit(1)
 
     if prompt_cache and ai_provider != LlmProvider.ANTHROPIC:
-        console.print("[bold red]Prompt cache flag is only available for Anthropic provider. Exiting...[/bold red]")
+        console_out.print("[bold red]Prompt cache flag is only available for Anthropic provider. Exiting...[/bold red]")
         raise typer.Exit(1)
 
-    with console.capture() if silent else nullcontext():
+    with console_out.capture() if silent else nullcontext():
         if cleanup in [CleanupType.BEFORE, CleanupType.BOTH]:
             if os.path.exists(output_folder):
                 shutil.rmtree(output_folder)
-                console.print(f"[bold green]Removed existing output folder: {output_folder}[/bold green]")
+                console_out.print(f"[bold green]Removed existing output folder: {output_folder}[/bold green]")
 
         start_time = time.time()
 
@@ -204,7 +204,7 @@ def main(
             source_type = "Local File" if is_local_file else "URL"
 
             # Display summary of options
-            console.print(
+            console_out.print(
                 Panel.fit(
                     Text.assemble(
                         (f"{source_type}: ", "cyan"),
@@ -263,7 +263,7 @@ def main(
                 )
             )
 
-            with console.status("[bold green]Working on data extraction and processing...") as status:
+            with console_out.status("[bold green]Working on data extraction and processing...") as status:
                 if is_local_file:
                     # Read local file
                     status.update("[bold cyan]Reading local file...")
@@ -312,25 +312,25 @@ def main(
                     if display_output.value in file_paths:
                         with open(file_paths[display_output.value], encoding="utf-8") as f:
                             content = f.read()
-                        display_formatted_output(content, display_output, console)
+                        display_formatted_output(content, display_output, console_out)
                     else:
-                        console.print(f"[bold red]Invalid output type: {display_output.value}[/bold red]")
+                        console_out.print(f"[bold red]Invalid output type: {display_output.value}[/bold red]")
 
             duration = time.time() - start_time
-            console.print(Panel.fit(f"Done in {duration:.2f} seconds."))
+            console_out.print(Panel.fit(f"Done in {duration:.2f} seconds."))
             # Display price summary
             show_llm_cost(cb.usage_metadata, show_pricing=pricing)
 
         except Exception as e:  # pylint: disable=broad-except
             # print(e)
-            console.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
+            console_out.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
 
         finally:
             if cleanup in [CleanupType.BOTH, CleanupType.AFTER]:
-                with console.status("[bold yellow]Cleaning up..."):
+                with console_out.status("[bold yellow]Cleaning up..."):
                     if os.path.exists(output_folder):
                         shutil.rmtree(output_folder)
-                        console.print(
+                        console_out.print(
                             f"[bold green]Removed output folder and its contents: {output_folder}[/bold green]"
                         )
 

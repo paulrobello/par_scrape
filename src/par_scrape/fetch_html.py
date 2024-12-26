@@ -6,6 +6,8 @@ import time
 
 import html2text
 from bs4 import BeautifulSoup
+from par_ai_core.par_logging import console_out
+from par_ai_core.user_agents import get_random_user_agent
 from playwright.sync_api import expect, sync_playwright
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
@@ -18,8 +20,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 from .enums import WaitType
-from .lib.user_agents import get_random_user_agent
-from .utils import console
 
 
 def setup_selenium(headless: bool = True) -> WebDriver:
@@ -50,7 +50,7 @@ def setup_selenium(headless: bool = True) -> WebDriver:
 
     try:
         chromedriver_path = ChromeDriverManager().install()
-        # console.log(chromedriver_path)
+        # console_out.log(chromedriver_path)
 
         service = Service(chromedriver_path, log_output=os.devnull)
 
@@ -58,9 +58,11 @@ def setup_selenium(headless: bool = True) -> WebDriver:
         driver = webdriver.Chrome(service=service, options=options)
         return driver
     except Exception as e:
-        console.print(f"[bold red]Error initializing Chrome WebDriver:[/bold red] {str(e)}")
-        console.print("[yellow]Please ensure Chrome is installed and up to date.[/yellow]")
-        console.print("[yellow]Also, make sure the ChromeDriver version matches your Chrome browser version.[/yellow]")
+        console_out.print(f"[bold red]Error initializing Chrome WebDriver:[/bold red] {str(e)}")
+        console_out.print("[yellow]Please ensure Chrome is installed and up to date.[/yellow]")
+        console_out.print(
+            "[yellow]Also, make sure the ChromeDriver version matches your Chrome browser version.[/yellow]"
+        )
         raise
 
 
@@ -94,7 +96,7 @@ def fetch_html_selenium(
         try:
             # Wait for page to load
             if wait_type == WaitType.PAUSE:
-                console.print("[yellow]Press Enter to continue...[/yellow]")
+                console_out.print("[yellow]Press Enter to continue...[/yellow]")
                 input()
             elif wait_type == WaitType.SLEEP and sleep_time > 0:
                 time.sleep(sleep_time)
@@ -113,7 +115,7 @@ def fetch_html_selenium(
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(3)  # Simulate time taken to scroll and read
         except TimeoutException:
-            console.print("[yellow]Timed out waiting for condition.[/yellow]")
+            console_out.print("[yellow]Timed out waiting for condition.[/yellow]")
 
         return driver.page_source
     finally:
@@ -143,7 +145,7 @@ def fetch_html_playwright(
         try:
             browser = p.chromium.launch(headless=headless)
         except Exception as e:  # pylint: disable=broad-except
-            console.print(
+            console_out.print(
                 "[bold red]Error launching playwright browser:[/bold red] Make sure you install playwright: `uv tool install playwright` then run `playwright install chromium`."  # pylint: disable=line-too-long
                 # pylint: disable=line-too-long
             )
@@ -155,7 +157,7 @@ def fetch_html_playwright(
         page.goto(url)
 
         if wait_type == WaitType.PAUSE:
-            console.print("[yellow]Press Enter to continue...[/yellow]")
+            console_out.print("[yellow]Press Enter to continue...[/yellow]")
             input()
         elif wait_type == WaitType.SLEEP:
             # Add delays to mimic human behavior
@@ -166,14 +168,14 @@ def fetch_html_playwright(
             if wait_selector:
                 page.wait_for_selector(wait_selector)
             else:
-                console.print(
+                console_out.print(
                     "[bold yellow]Warning:[/bold yellow] Please specify a selector when using wait_type=selector."
                 )
         elif wait_type == WaitType.TEXT:
             if wait_selector:
                 expect(page.locator("body")).to_contain_text(wait_selector)
             else:
-                console.print(
+                console_out.print(
                     "[bold yellow]Warning:[/bold yellow] Please specify a selector when using wait_type=text."
                 )
 
