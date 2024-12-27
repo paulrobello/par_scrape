@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build distribution 📦
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
