@@ -87,16 +87,40 @@ playwright install chromium
 To use PAR Scrape, you can run it from the command line with various options. Here's a basic example:
 Ensure you have the AI provider api key in your environment.
 You can also store your api keys in the file `~/.par_scrape.env` as follows:
-```bash
-GROQ_API_KEY= # is required for Groq. Get a free key from https://console.groq.com/
-ANTHROPIC_API_KEY= # is required for Anthropic. Get a key from https://console.anthropic.com/
-OPENAI_API_KEY= # is required for OpenAI. Get a key from https://platform.openai.com/account/api-keys
-GITHUB_TOKEN= # is required for GitHub Models. Get a free key from https://github.com/marketplace/models
-GOOGLE_API_KEY= # is required for Google Models. Get a free key from https://console.cloud.google.com
-LANGCHAIN_API_KEY= # is required for Langchain Langsmith tracing. Get a free key from https://smith.langchain.com/settings
-AWS_PROFILE= # is used for Bedrock authentication. The environment must already be authenticated with AWS.
-# No key required to use with Ollama models.
+```shell
+# AI API KEYS
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+GROQ_API_KEY=
+XAI_API_KEY=
+GOOGLE_API_KEY=
+MISTRAL_API_KEY=
+GITHUB_TOKEN=
+AWS_PROFILE=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+
+### Tracing (optional)
+LANGCHAIN_TRACING_V2=false
+LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
+LANGCHAIN_API_KEY=
+LANGCHAIN_PROJECT=par_ai
 ```
+
+### AI API KEYS
+
+* ANTHROPIC_API_KEY is required for Anthropic. Get a key from https://console.anthropic.com/
+* OPENAI_API_KEY is required for OpenAI. Get a key from https://platform.openai.com/account/api-keys
+* GITHUB_TOKEN is required for GitHub Models. Get a free key from https://github.com/marketplace/models
+* GOOGLE_API_KEY is required for Google Models. Get a free key from https://console.cloud.google.com
+* XAI_API_KEY is required for XAI. Get a free key from https://x.ai/api
+* GROQ_API_KEY is required for Groq. Get a free key from https://console.groq.com/
+* MISTRAL_API_KEY is required for Mistral. Get a free key from https://console.mistral.ai/
+* AWS_PROFILE or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are used for Bedrock authentication. The environment must
+  already be authenticated with AWS.
+* No key required to use with Ollama or LlamaCpp.
+* LANGCHAIN_API_KEY is required for Langchain / Langsmith tracing. Get a free key
+  from https://smith.langchain.com/settings
 
 ### Running from source
 ```bash
@@ -161,7 +185,18 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Description" -f "Price" -f "Cache Price"
 ```
 
+## Roadmap
+- Site crawling
+- PDF OCR and extraction
+
 ## Whats New
+- Version 0.4.9
+  - Updated to use new par-ai-core
+    - Now supports LlamaCPP and XAI Grok
+    - Better cost tracking
+    - Updated pricing data
+    - Better error handling
+  - Now supports Python 3.10
 - Version 0.4.8:
   - Added Anthropic prompt cache option.
 - Version 0.4.7:
