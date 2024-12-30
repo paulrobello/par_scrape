@@ -9,7 +9,7 @@ twine  := $(run) twine
 #build  := $(python) -m build
 build := uvx --from build pyproject-build --installer uv
 
-export UV_LINK_MODE=copy
+#export UV_LINK_MODE=copy
 export PIPENV_VERBOSITY=-1
 ##############################################################################
 # Run the app.
@@ -71,7 +71,7 @@ typecheck-stats:			# Perform static type checks with pyright and print stats
 	$(pyright) --stats
 
 .PHONY: checkall
-checkall: typecheck lint 	        # Check all the things
+checkall: format lint typecheck 	        # Check all the things
 
 .PHONY: pre-commit              # run pre-commit checks on all files
 pre-commit:

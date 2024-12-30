@@ -22,12 +22,9 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync
-      - name: Static Typecheck
+      - name: Lint and Typecheck
         run: |
-          make typecheck
-      - name: Lint
-        run: |
-          make lint
+          make checkall
       - name: Package
         run: make packagecheck
       - name: Cache build artifacts
