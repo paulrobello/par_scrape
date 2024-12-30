@@ -21,6 +21,8 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 - Customizable field extraction
 - Token usage and cost estimation
 - Prompt cache for Anthropic provider
+- Uses my [PAR AI Core](https://github.com/paulrobello/par_ai_core)
+
 
 ## Known Issues
 - Selenium silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
