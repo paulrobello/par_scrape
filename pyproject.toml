@@ -74,12 +74,14 @@ path = "src/par_scrape/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/par_scrape"]
 include = [
-    "*.py",
     "py.typed",
-    "*.png",
-    "*.md",
-    "*.tcss",
-    "*.png",
+    "**/*.py",
+    "**/*.html",
+    "**/*.gif",
+    "**/*.jpg",
+    "**/*.png",
+    "**/*.md",
+    "**/*.tcss",
 ]
 
 [tool.hatch.build.targets.sdist]
