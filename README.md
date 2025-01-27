@@ -27,6 +27,7 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 ## Known Issues
 - Selenium silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
 - Providers other than OpenAI are hit-and-miss depending on provider / model / data being extracted.
+- OpenRouter pricing display not available.
 
 ## Prompt Cache
 - OpenAI will auto cache prompts that are over 1024 tokens.
@@ -98,15 +99,18 @@ XAI_API_KEY=
 GOOGLE_API_KEY=
 MISTRAL_API_KEY=
 GITHUB_TOKEN=
+OPENROUTER_API_KEY=
+# Used by Bedrock
 AWS_PROFILE=
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
+
 
 ### Tracing (optional)
 LANGCHAIN_TRACING_V2=false
 LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
 LANGCHAIN_API_KEY=
-LANGCHAIN_PROJECT=par_ai
+LANGCHAIN_PROJECT=par_scrape
 ```
 
 ### AI API KEYS
@@ -118,11 +122,17 @@ LANGCHAIN_PROJECT=par_ai
 * XAI_API_KEY is required for XAI. Get a free key from https://x.ai/api
 * GROQ_API_KEY is required for Groq. Get a free key from https://console.groq.com/
 * MISTRAL_API_KEY is required for Mistral. Get a free key from https://console.mistral.ai/
+* OPENROUTER_KEY is required for OpenRouter. Get a key from https://openrouter.ai/
 * AWS_PROFILE or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are used for Bedrock authentication. The environment must
   already be authenticated with AWS.
 * No key required to use with Ollama or LlamaCpp.
-* LANGCHAIN_API_KEY is required for Langchain / Langsmith tracing. Get a free key
-  from https://smith.langchain.com/settings
+
+### Open AI Compatible Providers
+
+If a specify provider is not listed but has an OpenAI compatible endpoint you can use the following combo of vars:
+* PARAI_AI_PROVIDER=OpenAI
+* PARAI_MODEL=Your selected model
+* PARAI_AI_BASE_URL=The providers OpenAI endpoint URL
 
 ### Running from source
 ```bash
@@ -138,21 +148,21 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 
 - `--url`, `-u`: The URL to scrape or path to a local file (default: "https://openai.com/api/pricing/")
 - `--fields`, `-f`: Fields to extract from the webpage (default: ["Model", "Pricing Input", "Pricing Output"])
-- `--scraper`, `-s`: Scraper to use: 'selenium' or 'playwright' (default: "playwright")
+- `--scraper`, `-s`: Scraper to use: [selenium|playwright] (default: "playwright")
 - `--headless`, `-h`: Run in headless mode (for Selenium) (default: False)
 - `--wait-type`, `-w`: Method to use for page content load waiting [none|pause|sleep|idle|selector|text] (default: sleep).
 - `--wait-selector`, `-i`: Selector or text to use for page content load waiting.
 - `--sleep-time`, `-t`: Time to sleep (in seconds) before scrolling and closing browser (default: 5)
-- `--ai-provider`, `-a`: AI provider to use for processing (default: "OpenAI")
+- `--ai-provider`, `-a`: AI provider to use for processing [Ollama|LlamaCpp|OpenAI|Groq|XAI|Anthropic|Google|Bedrock|Github|Mistral|OpenRouter] (default: "OpenAI")
 - `--model`, `-m`: AI model to use for processing. If not specified, a default model will be used based on the provider.
 - `--prompt-cache`: Enable prompt cache for Anthropic provider. (default: False)
-- `--display-output`, `-d`: Display output in terminal (md, csv, or json)
+- `--display-output`, `-d`: Display output in terminal [none|plain|md|csv|json] (default: none)
 - `--output-folder`, `-o`: Specify the location of the output folder (default: "./output")
 - `--silent`, `-q`: Run in silent mode, suppressing output (default: False)
 - `--run-name`, `-n`: Specify a name for this run
 - `--version`, `-v`: Show the version and exit
-- `--pricing`: Enable pricing summary display ('details','cost', 'none') (default: 'none')
-- `--cleanup`, `-c`: How to handle cleanup of output folder (choices: none, before, after, both) (default: none)
+- `--pricing`: Enable pricing summary display [none|price|details] (default: 'none')
+- `--cleanup`, `-c`: How to handle cleanup of output folder [none|before|after|both] (default: none)
 - `--extraction-prompt`, `-e`: Path to alternate extraction prompt file
 - `--ai-base-url`, `-b`: Override the base URL for the AI provider.
 
@@ -189,9 +199,11 @@ par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Descript
 
 ## Roadmap
 - Site crawling
-- PDF OCR and extraction
 
 ## Whats New
+- Version 0.5.0
+  - Update ai-core and dependencies
+  - Now supports OpenRouter
 - Version 0.4.9
   - Updated to use new par-ai-core
     - Now supports LlamaCPP and XAI Grok
