@@ -71,3 +71,4 @@ __pypackages__/
 **/.idea
 /config.json
 /output/
+/.DS_Store
