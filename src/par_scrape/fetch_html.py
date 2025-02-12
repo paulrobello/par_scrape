@@ -216,7 +216,7 @@ def clean_html(html_content: str) -> str:
     ):
         element.decompose()  # Remove these tags and their content
 
-    html_content = soup.prettify(formatter="html")
+    html_content = str(soup.prettify(formatter="html"))
 
     ### text separators
     # Find all elements with role="separator"

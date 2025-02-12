@@ -100,10 +100,12 @@ GOOGLE_API_KEY=
 MISTRAL_API_KEY=
 GITHUB_TOKEN=
 OPENROUTER_API_KEY=
+DEEPSEEK_API_KEY=
 # Used by Bedrock
 AWS_PROFILE=
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
+
 
 
 ### Tracing (optional)
@@ -123,9 +125,11 @@ LANGCHAIN_PROJECT=par_scrape
 * GROQ_API_KEY is required for Groq. Get a free key from https://console.groq.com/
 * MISTRAL_API_KEY is required for Mistral. Get a free key from https://console.mistral.ai/
 * OPENROUTER_KEY is required for OpenRouter. Get a key from https://openrouter.ai/
+* DEEPSEEK_API_KEY is required for Deepseek. Get a key from https://platform.deepseek.com/
 * AWS_PROFILE or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are used for Bedrock authentication. The environment must
   already be authenticated with AWS.
-* No key required to use with Ollama or LlamaCpp.
+* No key required to use with Ollama, LlamaCpp, LiteLLM.
+
 
 ### Open AI Compatible Providers
 
@@ -153,7 +157,7 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 - `--wait-type`, `-w`: Method to use for page content load waiting [none|pause|sleep|idle|selector|text] (default: sleep).
 - `--wait-selector`, `-i`: Selector or text to use for page content load waiting.
 - `--sleep-time`, `-t`: Time to sleep (in seconds) before scrolling and closing browser (default: 5)
-- `--ai-provider`, `-a`: AI provider to use for processing [Ollama|LlamaCpp|OpenAI|Groq|XAI|Anthropic|Google|Bedrock|Github|Mistral|OpenRouter] (default: "OpenAI")
+- `--ai-provider`, `-a`: AI provider to use for processing [Ollama|LlamaCpp|OpenRouter|OpenAI|Gemini|Github|XAI|Anthropic|Groq|Mistral|Deepseek|LiteLLM|Bedrock] (default: "OpenAI")
 - `--model`, `-m`: AI model to use for processing. If not specified, a default model will be used based on the provider.
 - `--prompt-cache`: Enable prompt cache for Anthropic provider. (default: False)
 - `--display-output`, `-d`: Display output in terminal [none|plain|md|csv|json] (default: none)
@@ -170,27 +174,27 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 
 1. Basic usage with default options:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Model" -f "Pricing Input" -f "Pricing Output" --pricing -w text -i gpt-4o
+par_scrape --url "https://openai.com/api/pricing/" -f "Model" -f "Pricing Input" -f "Pricing Output" --pricing details --display-output csv
 ```
-2. Using Playwright and displaying JSON output:
+2. Using Playwright, displaying JSON output and waiting for text gpt-4o to be in page before continuing:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --scraper playwright -d json --pricing -w text -i gpt-4o
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --scraper playwright -d json --pricing details -w text -i gpt-4o
 ```
 3. Specifying a custom model and output folder:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --model gpt-4 --output-folder ./custom_output --pricing -w text -i gpt-4o
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --model gpt-4 --output-folder ./custom_output --pricing details -w text -i gpt-4o
 ```
 4. Running in silent mode with a custom run name:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --silent --run-name my_custom_run --pricing -w text -i gpt-4o
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --silent --run-name my_custom_run --pricing details -w text -i gpt-4o
 ```
 5. Using the cleanup option to remove the output folder after scraping:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --cleanup --pricing
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --cleanup --pricing details
 ```
 6. Using the pause option to wait for user input before scrolling:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --pause --pricing
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --pause --pricing details
 ```
 7. Using Anthropic provider with prompt cache enabled and detailed pricing breakdown:
 ```bash
@@ -201,6 +205,10 @@ par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Descript
 - Site crawling
 
 ## Whats New
+- Version 0.5.1
+  - Update ai-core and dependencies
+  - Now supports Deepseek, XAI and LiteLLM
+  - Better pricing data
 - Version 0.5.0
   - Update ai-core and dependencies
   - Now supports OpenRouter

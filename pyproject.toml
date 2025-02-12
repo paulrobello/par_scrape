@@ -1,13 +1,18 @@
 [project]
 name = "par_scrape"
-dynamic = ["version"]
+dynamic = [
+    "version",
+]
 description = "A versatile web scraping tool with options for Selenium or Playwright, featuring OpenAI-powered data extraction and formatting."
 url = "https://github.com/paulrobello/par_scrape"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
-authors = [{ name = "Paul Robello", email = "probello@gmail.com" }]
-maintainers = [{ name = "Paul Robello", email = "probello@gmail.com" }]
+authors = [
+    { name = "Paul Robello", email = "probello@gmail.com" },
+]
+maintainers = [
+    { name = "Paul Robello", email = "probello@gmail.com" },
+]
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Environment :: Console",
@@ -26,14 +31,26 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: Browsers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Text Processing :: Markup :: HTML",
-    "Typing :: Typed"
+    "Typing :: Typed",
 ]
-keywords = ["web scraping", "data extraction", "selenium", "playwright", "openai", "anthropic", "ollama", "llamacpp"]
+keywords = [
+    "web scraping",
+    "data extraction",
+    "selenium",
+    "playwright",
+    "openai",
+    "anthropic",
+    "xai",
+    "openrouter",
+    "groq",
+    "ollama",
+    "llamacpp",
+]
 dependencies = [
-    "beautifulsoup4>=4.12.3",
+    "beautifulsoup4>=4.13.3",
     "html2text>=2024.2.26",
     "pandas>=2.2.3",
-    "playwright>=1.49.1",
+    "playwright>=1.50.0",
     "pydantic>=2.10.6",
     "python-dotenv>=1.0.1",
     "rich>=13.9.4",
@@ -43,12 +60,14 @@ dependencies = [
     "webdriver-manager>=4.0.2",
     "openpyxl>=3.1.5",
     "tabulate>=0.9.0",
-    "par-ai-core>=0.1.12",
+    "par-ai-core>=0.1.17",
+]
+packages = [
+    "src/par_scrape",
 ]
 
-packages = [
-    "src/par_scrape"
-]
+[project.license]
+file = "LICENSE"
 
 [project.urls]
 Homepage = "https://github.com/paulrobello/par_scrape"
@@ -62,7 +81,10 @@ Wiki = "https://github.com/paulrobello/par_scrape/wiki"
 par_scrape = "par_scrape.__main__:app"
 
 [build-system]
-requires = ["hatchling", "wheel"]
+requires = [
+    "hatchling",
+    "wheel",
+]
 build-backend = "hatchling.build"
 
 [dependency-groups]
@@ -70,7 +92,7 @@ dev = [
     "build>=1.2.1",
     "twine>=6.1.0",
     "pyright>=1.1.379",
-    "ruff>=0.9.3",
+    "ruff>=0.9.6",
     "pre-commit>=4.1.0",
 ]
 
@@ -78,7 +100,9 @@ dev = [
 path = "src/par_scrape/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/par_scrape"]
+packages = [
+    "src/par_scrape",
+]
 include = [
     "py.typed",
     "**/*.py",
@@ -96,11 +120,11 @@ include = [
     "LICENSE",
     "README.md",
     "extraction_prompt.md",
-    "pyproject.toml"
+    "pyproject.toml",
 ]
 exclude = [
     "*.pyc",
     "__pycache__",
     "*.so",
-    "*.dylib"
+    "*.dylib",
 ]
