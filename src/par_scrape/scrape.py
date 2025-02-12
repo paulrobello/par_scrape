@@ -1,9 +1,9 @@
 """Web crawling functionality for par_scrape."""
 
 import sqlite3
+from collections.abc import Iterable
 from enum import Enum
 from pathlib import Path
-from typing import Iterable
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
@@ -43,7 +43,7 @@ def add_to_queue(urls: Iterable[str]) -> None:
                 INSERT OR IGNORE INTO scrape (url, status) 
                 VALUES (?, ?)
             """, (url, PageStatus.QUEUED.value))
-            
+
             # Reset error status if re-adding
             conn.execute("""
                 UPDATE scrape 
@@ -61,12 +61,12 @@ def extract_links(base_url: str, html: str, scrape_type: ScrapeType) -> list[str
     """Extract links from HTML based on crawl type."""
     soup = BeautifulSoup(html, "html.parser")
     links = []
-    
+
     for link in soup.find_all("a", href=True):
         href = link["href"]
         full_url = urljoin(base_url, href)
         parsed = urlparse(full_url)
-        
+
         if scrape_type == ScrapeType.SINGLE_LEVEL:
             if parsed.netloc == urlparse(base_url).netloc:
                 links.append(full_url)
@@ -76,7 +76,7 @@ def extract_links(base_url: str, html: str, scrape_type: ScrapeType) -> list[str
         elif scrape_type == ScrapeType.PAGINATED:
             if "next" in link.get("rel", []) or "page" in link.text.lower():
                 links.append(full_url)
-    
+
     return list(set(links))
 
 def get_next_url() -> str | None:
