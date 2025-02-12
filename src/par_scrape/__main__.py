@@ -39,6 +39,7 @@ from par_scrape.scrape_data import (
 )
 
 from . import __application_title__, __version__
+from .scrape import ScrapeType, init_db, add_to_queue, get_next_url, mark_complete, mark_error, get_tld_folder
 
 new_env_path = Path("~/.par_scrape.env").expanduser()
 old_env_path = Path("~/.par-scrape.env").expanduser()
@@ -166,6 +167,14 @@ def main(
         bool | None,
         typer.Option("--version", "-v", callback=version_callback, is_eager=True),
     ] = None,
+    scrape: Annotated[
+        ScrapeType | None,
+        typer.Option(
+            "--scrape",
+            help="Enable crawling mode (single_level/domain/paginated)",
+            case_sensitive=False,
+        ),
+    ] = None,
 ):
     """Scrape and analyze data from a website."""
     if not model:
@@ -204,9 +213,21 @@ def main(
             source_type = "Local File" if is_local_file else "URL"
 
             # Display summary of options
-            console_out.print(
-                Panel.fit(
-                    Text.assemble(
+            init_db()
+            add_to_queue([url])
+
+            while True:
+                current_url = get_next_url()
+                if not current_url:
+                    break
+                    
+                try:
+                    # Update output folder based on TLD
+                    output_folder = get_tld_folder(current_url)
+
+                    console_out.print(
+                        Panel.fit(
+                            Text.assemble(
                         (f"{source_type}: ", "cyan"),
                         (f"{url}", "green"),
                         "\n",
