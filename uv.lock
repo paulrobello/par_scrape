@@ -2616,7 +2616,7 @@ wheels = [
 [[package]]
 name = "par-ai-core"
 version = "0.1.18"
-source = { editable = "../par_ai_core" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "boto3" },
@@ -2656,63 +2656,9 @@ dependencies = [
     { name = "webdriver-manager" },
     { name = "youtube-transcript-api" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "beautifulsoup4", specifier = ">=4.13.3" },
-    { name = "boto3", specifier = ">=1.36.18" },
-    { name = "botocore", specifier = ">=1.36.18" },
-    { name = "html2text", specifier = ">=2024.2.26" },
-    { name = "langchain", specifier = ">=0.3.18" },
-    { name = "langchain-anthropic", specifier = ">=0.3.7" },
-    { name = "langchain-aws", specifier = ">=0.2.12" },
-    { name = "langchain-chroma", specifier = ">=0.2.1" },
-    { name = "langchain-community", specifier = ">=0.3.17" },
-    { name = "langchain-core", specifier = ">=0.3.34" },
-    { name = "langchain-deepseek", specifier = ">=0.1.2" },
-    { name = "langchain-experimental", specifier = ">=0.3.4" },
-    { name = "langchain-google-community", specifier = ">=2.0.4" },
-    { name = "langchain-google-genai", specifier = ">=2.0.9" },
-    { name = "langchain-groq", specifier = ">=0.2.4" },
-    { name = "langchain-mistralai", specifier = ">=0.2.6" },
-    { name = "langchain-ollama", specifier = ">=0.2.3" },
-    { name = "langchain-openai", specifier = ">=0.3.5" },
-    { name = "langchain-qdrant", specifier = ">=0.2.0" },
-    { name = "langchain-text-splitters", specifier = ">=0.3.6" },
-    { name = "langchain-xai", specifier = ">=0.2.0" },
-    { name = "langgraph", specifier = ">=0.2.71" },
-    { name = "litellm", specifier = ">=1.61.1" },
-    { name = "markdownify", specifier = ">=0.14.1" },
-    { name = "orjson", specifier = ">=3.10.15" },
-    { name = "playwright", specifier = ">=1.50.0" },
-    { name = "praw", specifier = ">=7.8.1" },
-    { name = "pydantic", specifier = ">=2.10.6" },
-    { name = "pydantic-core", specifier = ">=2.27.2" },
-    { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "requests", specifier = ">=2.32.3" },
-    { name = "rich", specifier = ">=13.9.4" },
-    { name = "selenium", specifier = ">=4.28.1" },
-    { name = "strenum", specifier = ">=0.4.15" },
-    { name = "tavily-python", specifier = ">=0.5.1" },
-    { name = "webdriver-manager", specifier = ">=4.0.2" },
-    { name = "youtube-transcript-api", specifier = ">=0.6.3" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "build", specifier = ">=1.2.1" },
-    { name = "pdoc3", specifier = ">=0.11.5" },
-    { name = "pre-commit", specifier = ">=3.8.0" },
-    { name = "pyinstrument", specifier = ">=5.0.0" },
-    { name = "pyright", specifier = ">=1.1.379" },
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23.5" },
-    { name = "pytest-cov", specifier = ">=4.1.0" },
-    { name = "pytest-mock", specifier = ">=3.14.0" },
-    { name = "pytest-xdist", specifier = ">=3.6.1" },
-    { name = "ruff", specifier = ">=0.7.0" },
-    { name = "twine", specifier = ">=5.1.1" },
-    { name = "types-orjson", specifier = ">=3.6.2" },
+sdist = { url = "https://files.pythonhosted.org/packages/6f/20/60c8e6bbfe1c3e331d3725f0ae21c01341686d8006ed98e6fcae2537728e/par_ai_core-0.1.18.tar.gz", hash = "sha256:0ba22c5f11334fb415018e2c5bc37350afeab5e7841889df2cb87c21685feadd", size = 117625 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/85/2f448479c0486ec268076d2588f949c9bcd2bb31f7ec9deb24b51a1ee2d6/par_ai_core-0.1.18-py3-none-any.whl", hash = "sha256:d0e49e99122d7155af0b7f8cf206e69eb6178ed9c0dd29b525784b82e1aaf6a6", size = 156655 },
 ]
 
 [[package]]
@@ -2751,7 +2697,7 @@ requires-dist = [
     { name = "html2text", specifier = ">=2024.2.26" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.2.3" },
-    { name = "par-ai-core", editable = "../par_ai_core" },
+    { name = "par-ai-core", specifier = ">=0.1.18" },
     { name = "pydantic", specifier = ">=2.10.6" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "rich", specifier = ">=13.9.4" },
