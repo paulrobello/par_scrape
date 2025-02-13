@@ -205,6 +205,9 @@ par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Descript
 - Site crawling
 
 ## Whats New
+- Version 0.6.0
+  - Now uses par_ai_core for url fetching
+  - Now supports site crawling
 - Version 0.5.1
   - Update ai-core and dependencies
   - Now supports Deepseek, XAI and LiteLLM

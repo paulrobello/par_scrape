@@ -72,3 +72,6 @@ __pypackages__/
 /config.json
 /output/
 /.DS_Store
+/.ruff_cache/
+/src/par_scrape/pages/
+/src/par_scrape/jobs.sqlite

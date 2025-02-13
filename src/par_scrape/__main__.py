@@ -21,13 +21,23 @@ from par_ai_core.output_utils import DisplayOutputFormat, display_formatted_outp
 from par_ai_core.par_logging import console_out
 from par_ai_core.pricing_lookup import PricingDisplay, show_llm_cost
 from par_ai_core.provider_cb_info import get_parai_callback
+from par_ai_core.web_tools import ScraperChoice, ScraperWaitType, fetch_url
 from rich.panel import Panel
 from rich.text import Text
 
-from par_scrape.enums import CleanupType, ScraperChoice, WaitType
+from par_scrape import __application_title__, __version__
+from par_scrape.crawl import (
+    CrawlType,
+    add_to_queue,
+    extract_links,
+    get_next_url,
+    get_tld_folder,
+    init_db,
+    mark_complete,
+    mark_error,
+)
+from par_scrape.enums import CleanupType
 from par_scrape.fetch_html import (
-    fetch_html_playwright,
-    fetch_html_selenium,
     html_to_markdown_with_readability,
 )
 from par_scrape.scrape_data import (
@@ -38,11 +48,9 @@ from par_scrape.scrape_data import (
     save_raw_data,
 )
 
-from . import __application_title__, __version__
-from .scrape import ScrapeType, init_db, add_to_queue, get_next_url, mark_complete, mark_error, get_tld_folder
-
-new_env_path = Path("~/.par_scrape.env").expanduser()
 old_env_path = Path("~/.par-scrape.env").expanduser()
+new_env_path = Path("~/.par_scrape.env").expanduser()
+
 if old_env_path.exists():
     if new_env_path.exists():
         old_env_path.unlink()
@@ -83,14 +91,14 @@ def main(
         ),
     ] = ScraperChoice.PLAYWRIGHT,
     wait_type: Annotated[
-        WaitType,
+        ScraperWaitType,
         typer.Option(
             "--wait-type",
             "-w",
             help="Method to use for page content load waiting",
             case_sensitive=False,
         ),
-    ] = WaitType.SLEEP,
+    ] = ScraperWaitType.SLEEP,
     wait_selector: Annotated[
         str | None,
         typer.Option(
@@ -154,7 +162,7 @@ def main(
     pricing: Annotated[
         PricingDisplay,
         typer.Option("--pricing", "-p", help="Enable pricing summary display"),
-    ] = PricingDisplay.NONE,
+    ] = PricingDisplay.DETAILS,
     cleanup: Annotated[
         CleanupType,
         typer.Option("--cleanup", "-c", help="How to handle cleanup of output folder."),
@@ -163,24 +171,25 @@ def main(
         Path | None,
         typer.Option("--extraction-prompt", "-e", help="Path to the extraction prompt file"),
     ] = None,
+    crawl_type: Annotated[
+        CrawlType,
+        typer.Option(
+            "--crawl-type",
+            "-C",
+            help="Enable crawling mode",
+            case_sensitive=False,
+        ),
+    ] = CrawlType.SINGLE_PAGE,
     version: Annotated[  # pylint: disable=unused-argument
         bool | None,
         typer.Option("--version", "-v", callback=version_callback, is_eager=True),
-    ] = None,
-    scrape: Annotated[
-        ScrapeType | None,
-        typer.Option(
-            "--scrape",
-            help="Enable crawling mode (single_level/domain/paginated)",
-            case_sensitive=False,
-        ),
     ] = None,
 ):
     """Scrape and analyze data from a website."""
     if not model:
         model = provider_default_models[ai_provider]
 
-    if ai_provider not in [LlmProvider.OLLAMA, LlmProvider.BEDROCK]:
+    if ai_provider not in [LlmProvider.OLLAMA, LlmProvider.BEDROCK, LlmProvider.LITELLM]:
         key_name = provider_env_key_names[ai_provider]
         if not os.environ.get(key_name):
             console_out.print(f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]")
@@ -208,27 +217,13 @@ def main(
                 if not run_name:
                     run_name = str(uuid4())
 
-            # Check if url is a local file
-            is_local_file = os.path.isfile(url)
-            source_type = "Local File" if is_local_file else "URL"
-
             # Display summary of options
             init_db()
-            add_to_queue([url])
+            add_to_queue(run_name, [url])
 
-            while True:
-                current_url = get_next_url()
-                if not current_url:
-                    break
-                    
-                try:
-                    # Update output folder based on TLD
-                    output_folder = get_tld_folder(current_url)
-
-                    console_out.print(
-                        Panel.fit(
-                            Text.assemble(
-                        (f"{source_type}: ", "cyan"),
+            console_out.print(
+                Panel.fit(
+                    Text.assemble(
                         (f"{url}", "green"),
                         "\n",
                         ("AI Provider: ", "cyan"),
@@ -244,23 +239,26 @@ def main(
                         (f"{prompt_cache}", "green"),
                         "\n",
                         ("Scraper: ", "cyan"),
-                        (f"{scraper if not is_local_file else 'N/A'}", "green"),
+                        (f"{scraper}", "green"),
+                        "\n",
+                        ("Scrape Type: ", "cyan"),
+                        (f"{crawl_type.value}", "green"),
                         "\n",
                         ("Headless: ", "cyan"),
-                        (f"{headless if not is_local_file else 'N/A'}", "green"),
+                        (f"{headless}", "green"),
                         "\n",
                         ("Wait Type: ", "cyan"),
                         (f"{wait_type.value}", "green"),
                         "\n",
                         ("Wait Selector: ", "cyan"),
                         (
-                            f"{wait_selector if wait_type in (WaitType.SELECTOR, WaitType.TEXT) else 'N/A'}",
+                            f"{wait_selector if wait_type in (ScraperWaitType.SELECTOR, ScraperWaitType.TEXT) else 'N/A'}",
                             "green",
                         ),
                         "\n",
                         ("Sleep Time: ", "cyan"),
                         (
-                            f"{sleep_time if not is_local_file else 'N/A'} seconds",
+                            f"{sleep_time} seconds",
                             "green",
                         ),
                         "\n",
@@ -283,65 +281,98 @@ def main(
                     border_style="bold",
                 )
             )
+            llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0, base_url=ai_base_url)
+            # Create the dynamic listing model
+            console_out.print("[bold cyan]Creating dynamic models...")
+            dynamic_listing_model = create_dynamic_listing_model(fields)
+            dynamic_listings_container = create_listings_container_model(dynamic_listing_model)
 
-            with console_out.status("[bold green]Working on data extraction and processing...") as status:
-                if is_local_file:
-                    # Read local file
-                    status.update("[bold cyan]Reading local file...")
-                    with open(url, encoding="utf-8") as file:
-                        markdown = file.read()
-                    run_name = os.path.splitext(os.path.basename(url))[0].replace("rawData_", "")
-                else:
-                    # Scrape data
-                    status.update("[bold cyan]Fetching HTML...")
-                    if scraper == ScraperChoice.PLAYWRIGHT:
-                        raw_html = fetch_html_playwright(url, headless, wait_type, wait_selector, sleep_time)
-                    else:
-                        raw_html = fetch_html_selenium(url, headless, wait_type, wait_selector, sleep_time)
+            console_out.print("[bold cyan]Starting fetch loop")
+            with get_parai_callback(show_pricing=pricing) as cb:
+                while True:
+                    current_url = get_next_url(run_name)
+                    if not current_url:
+                        break
 
-                    status.update("[bold cyan]Converting HTML to Markdown...")
-                    markdown = html_to_markdown_with_readability(raw_html)
-                    # Save raw data
-                    status.update("[bold cyan]Saving raw data...")
-                    save_raw_data(markdown, run_name, output_folder)
+                    try:
+                        # Update output folder based on TLD
+                        output_folder = get_tld_folder(current_url)
 
-                llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0, base_url=ai_base_url)
-                with get_parai_callback() as cb:
-                    # Create the dynamic listing model
-                    status.update("[bold cyan]Creating dynamic models...")
-                    dynamic_listing_model = create_dynamic_listing_model(fields)
-                    dynamic_listings_container = create_listings_container_model(dynamic_listing_model)
+                        console_out.print(f"[green]{current_url}")
+                        console_out.print(f"[green]{output_folder}")
 
-                    # Format data
-                    status.update("[bold cyan]Formatting data...")
-                    formatted_data = format_data(
-                        data=markdown,
-                        dynamic_listings_container=dynamic_listings_container,
-                        llm_config=llm_config,
-                        prompt_cache=prompt_cache,
-                        extraction_prompt=extraction_prompt,
-                    )
-                    if not formatted_data:
-                        raise ValueError("No data was found by the scrape.")
+                        with console_out.status("[bold green]Working on data extraction and processing...") as status:
+                            # Scrape data
+                            status.update("[bold cyan]Fetching HTML...")
+                            raw_html = fetch_url(
+                                url,
+                                fetch_using=ScraperChoice.PLAYWRIGHT.value,
+                                sleep_time=sleep_time,
+                                wait_type=wait_type,
+                                wait_selector=wait_selector,
+                                headless=headless,
+                                verbose=True,
+                                console=console_out,
+                            )
+                            if not raw_html:
+                                raise ValueError("No data was fetched")
+                            else:
+                                raw_html = raw_html[0]
+                            if not raw_html:
+                                raise ValueError("No data was fetched")
 
-                    # Save formatted data
-                    status.update("[bold cyan]Saving formatted data...")
-                    _, file_paths = save_formatted_data(formatted_data, run_name, output_folder)
+                            # add_to_queue(run_name, extract_links(current_url, raw_html, scrape_type))
+                            console_out.print(extract_links(current_url, raw_html, crawl_type))
+                            break
+                            status.update("[bold cyan]Converting HTML to Markdown...")
+                            markdown = html_to_markdown_with_readability(raw_html)
+                            # Save raw data
+                            status.update("[bold cyan]Saving raw data...")
+                            save_raw_data(markdown, run_name, output_folder)
 
-                # Display output if requested
-                if display_output:
-                    if display_output.value in file_paths:
-                        with open(file_paths[display_output.value], encoding="utf-8") as f:
-                            content = f.read()
-                        display_formatted_output(content, display_output, console_out)
-                    else:
-                        console_out.print(f"[bold red]Invalid output type: {display_output.value}[/bold red]")
+                            if not markdown:
+                                raise ValueError("No data was fetched")
 
-            duration = time.time() - start_time
-            console_out.print(Panel.fit(f"Done in {duration:.2f} seconds."))
-            # Display price summary
-            show_llm_cost(cb.usage_metadata, show_pricing=pricing)
+                            if "Application error" in markdown:
+                                raise ValueError("Application error encountered.")
 
+                            # Format data
+                            status.update("[bold cyan]Formatting data...")
+                            formatted_data = format_data(
+                                data=markdown,
+                                dynamic_listings_container=dynamic_listings_container,
+                                llm_config=llm_config,
+                                prompt_cache=prompt_cache,
+                                extraction_prompt=extraction_prompt,
+                            )
+                            if not formatted_data:
+                                raise ValueError("No data was found by the scrape.")
+
+                            # Save formatted data
+                            status.update("[bold cyan]Saving formatted data...")
+                            _, file_paths = save_formatted_data(formatted_data, run_name, output_folder)
+                            mark_complete(run_name, url)
+                            # Display output if requested
+                            if display_output:
+                                if display_output.value in file_paths:
+                                    with open(file_paths[display_output.value], encoding="utf-8") as f:
+                                        content = f.read()
+                                    display_formatted_output(content, display_output, console_out)
+                                else:
+                                    console_out.print(
+                                        f"[bold red]Invalid output type: {display_output.value}[/bold red]"
+                                    )
+
+                        duration = time.time() - start_time
+                        console_out.print(Panel.fit(f"Done in {duration:.2f} seconds."))
+
+                        console_out.print("Current session price:")
+                        show_llm_cost(cb.usage_metadata, show_pricing=PricingDisplay.PRICE, console=console_out)
+                    except Exception as e:  # pylint: disable=broad-except
+                        mark_error(run_name, current_url, str(e))
+                        console_out.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
+                # end while True
+            # end get_parai_callback
         except Exception as e:  # pylint: disable=broad-except
             # print(e)
             console_out.print(f"[bold red]An error occurred:[/bold red] {str(e)}")

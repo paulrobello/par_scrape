@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, create_model
 from rich.panel import Panel
 
 
-def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
+def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> Path:
     """
     Save raw data to a file.
 
@@ -22,15 +22,14 @@ def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> str:
         output_folder (str, optional): The folder to save the file in. Defaults to 'output'.
 
     Returns:
-        str: The path to the saved file.
+        Path: The path to the saved file.
     """
     # Ensure the output folder exists
     os.makedirs(output_folder, exist_ok=True)
 
     # Save the raw markdown data with run_name in filename
-    raw_output_path = os.path.join(output_folder, f"rawData_{run_name}.md")
-    with open(raw_output_path, "w", encoding="utf-8") as f:
-        f.write(raw_data)
+    raw_output_path = output_folder / f"rawData_{run_name}.md"
+    raw_output_path.write_text(raw_data)
     console_out.print(Panel(f"Raw data saved to [bold green]{raw_output_path}[/bold green]"))
     return raw_output_path
 
