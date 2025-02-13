@@ -21,7 +21,7 @@ from par_ai_core.output_utils import DisplayOutputFormat, display_formatted_outp
 from par_ai_core.par_logging import console_out
 from par_ai_core.pricing_lookup import PricingDisplay, show_llm_cost
 from par_ai_core.provider_cb_info import get_parai_callback
-from par_ai_core.web_tools import ScraperChoice, ScraperWaitType, fetch_url
+from par_ai_core.web_tools import ScraperChoice, ScraperWaitType, fetch_url, html_to_markdown
 from rich.panel import Panel
 from rich.text import Text
 
@@ -29,7 +29,6 @@ from par_scrape import __application_title__, __version__
 from par_scrape.crawl import (
     CrawlType,
     add_to_queue,
-    extract_links,
     get_next_url,
     get_tld_folder,
     init_db,
@@ -37,9 +36,6 @@ from par_scrape.crawl import (
     mark_error,
 )
 from par_scrape.enums import CleanupType
-from par_scrape.fetch_html import (
-    html_to_markdown_with_readability,
-)
 from par_scrape.scrape_data import (
     create_dynamic_listing_model,
     create_listings_container_model,
@@ -322,10 +318,10 @@ def main(
                                 raise ValueError("No data was fetched")
 
                             # add_to_queue(run_name, extract_links(current_url, raw_html, scrape_type))
-                            console_out.print(extract_links(current_url, raw_html, crawl_type))
-                            break
+                            # console_out.print(extract_links(current_url, raw_html, crawl_type))
+                            # break
                             status.update("[bold cyan]Converting HTML to Markdown...")
-                            markdown = html_to_markdown_with_readability(raw_html)
+                            markdown = html_to_markdown(raw_html, url=current_url)
                             # Save raw data
                             status.update("[bold cyan]Saving raw data...")
                             save_raw_data(markdown, run_name, output_folder)

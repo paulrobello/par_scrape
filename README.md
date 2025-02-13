@@ -149,26 +149,30 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```
 
 ### Options
-
-- `--url`, `-u`: The URL to scrape or path to a local file (default: "https://openai.com/api/pricing/")
-- `--fields`, `-f`: Fields to extract from the webpage (default: ["Model", "Pricing Input", "Pricing Output"])
-- `--scraper`, `-s`: Scraper to use: [selenium|playwright] (default: "playwright")
-- `--headless`, `-h`: Run in headless mode (for Selenium) (default: False)
-- `--wait-type`, `-w`: Method to use for page content load waiting [none|pause|sleep|idle|selector|text] (default: sleep).
-- `--wait-selector`, `-i`: Selector or text to use for page content load waiting.
-- `--sleep-time`, `-t`: Time to sleep (in seconds) before scrolling and closing browser (default: 5)
-- `--ai-provider`, `-a`: AI provider to use for processing [Ollama|LlamaCpp|OpenRouter|OpenAI|Gemini|Github|XAI|Anthropic|Groq|Mistral|Deepseek|LiteLLM|Bedrock] (default: "OpenAI")
-- `--model`, `-m`: AI model to use for processing. If not specified, a default model will be used based on the provider.
-- `--prompt-cache`: Enable prompt cache for Anthropic provider. (default: False)
-- `--display-output`, `-d`: Display output in terminal [none|plain|md|csv|json] (default: none)
-- `--output-folder`, `-o`: Specify the location of the output folder (default: "./output")
-- `--silent`, `-q`: Run in silent mode, suppressing output (default: False)
-- `--run-name`, `-n`: Specify a name for this run
-- `--version`, `-v`: Show the version and exit
-- `--pricing`: Enable pricing summary display [none|price|details] (default: 'none')
-- `--cleanup`, `-c`: How to handle cleanup of output folder [none|before|after|both] (default: none)
-- `--extraction-prompt`, `-e`: Path to alternate extraction prompt file
-- `--ai-base-url`, `-b`: Override the base URL for the AI provider.
+```
+--url                 -u      TEXT                                                                     URL to scrape [default: https://openai.com/api/pricing/]]
+--fields              -f      TEXT                                                                     Fields to extract from the webpage [default: Model, Pricing Input, Pricing Output, Cache Price]
+--scraper             -s      [selenium|playwright]                                                    Scraper to use: 'selenium' or 'playwright' [default: playwright]
+--wait-type           -w      [none|pause|sleep|idle|selector|text]                                    Method to use for page content load waiting [default: sleep]
+--wait-selector       -i      TEXT                                                                     Selector or text to use for page content load waiting. [default: None]
+--headless            -h                                                                               Run in headless mode (for Selenium)
+--sleep-time          -t      INTEGER                                                                  Time to sleep before scrolling (in seconds) [default: 3]
+--ai-provider         -a      [Ollama|LlamaCpp|OpenRouter|OpenAI|Gemini|Github|XAI|Anthropic|          AI provider to use for processing [default: OpenAI]       
+                               Groq|Mistral|Deepseek|LiteLLM|Bedrock]│
+--model               -m      TEXT                                                                     AI model to use for processing. If not specified, a default model will be used.[default: None]                                                         │
+--ai-base-url         -b      TEXT                                                                     Override the base URL for the AI provider. [default: None]
+--prompt-cache                                                                                         Enable prompt cache for Anthropic provider
+--display-output      -d      [none|plain|md|csv|json]                                                 Display output in terminal (md, csv, or json) [default: None]
+--output-folder       -o      PATH                                                                     Specify the location of the output folder [default: output]
+--silent              -q                                                                               Run in silent mode, suppressing output
+--run-name            -n      TEXT                                                                     Specify a name for this run
+--pricing             -p      [none|price|details]                                                     Enable pricing summary display [default: details]
+--cleanup             -c      [none|before|after|both]                                                 How to handle cleanup of output folder. [default: none]
+--extraction-prompt   -e      PATH                                                                     Path to the extraction prompt file [default: None]
+--crawl-type          -C      [single_page|single_level|domain|paginated]                              Enable crawling mode [default: single_page]
+--version             -v                                                                               Show the version and exit.
+--help                                                                                                 Show this message and exit.
+```
 
 ### Examples
 
@@ -206,7 +210,8 @@ par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Descript
 
 ## Whats New
 - Version 0.6.0
-  - Now uses par_ai_core for url fetching
+  - Now uses par_ai_core for url fetching and markdown conversion
+  - Updated system prompt for better results
   - Now supports site crawling
 - Version 0.5.1
   - Update ai-core and dependencies

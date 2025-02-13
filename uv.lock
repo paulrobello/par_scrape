@@ -1553,17 +1553,16 @@ wheels = [
 
 [[package]]
 name = "langchain-chroma"
-version = "0.2.1"
+version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "chromadb" },
-    { name = "fastapi" },
     { name = "langchain-core" },
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/39/81/7a6bb029a87511df844c33d38a8c97197e5796fcb1bf9e19b928ceba69cd/langchain_chroma-0.2.1.tar.gz", hash = "sha256:ebda061164243c9fdd081903aaa8f8559847d3aec945b9aa143a5075f57cd4dd", size = 11034 }
+sdist = { url = "https://files.pythonhosted.org/packages/40/be/bf74dc6b721d71b29134d15703bdc167cd26e17667b68ef55a0feb701e7a/langchain_chroma-0.2.2.tar.gz", hash = "sha256:11225ca6077b2bf919b84d74e4d343121e077c0fa3274db1929a270fef9d1002", size = 15890 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/36/3d/865bfe0b076ee2528035b6649e3ef6aad1990920fddffba00e34226c72d9/langchain_chroma-0.2.1-py3-none-any.whl", hash = "sha256:4acc3fc5e919991ab412153819965e8dd9caf7e65873be2da432dc8e59cf05bb", size = 11162 },
+    { url = "https://files.pythonhosted.org/packages/e0/ad/02b43c9c6243d430a32fda148236ba02e49289326a58aeef57723f3a92fe/langchain_chroma-0.2.2-py3-none-any.whl", hash = "sha256:7766335f16975c2059bb6e8ea75a59a4082c52e6c9d66827681d1bce2c2756a2", size = 11364 },
 ]
 
 [[package]]
@@ -1764,29 +1763,29 @@ wheels = [
 
 [[package]]
 name = "langgraph"
-version = "0.2.71"
+version = "0.2.72"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain-core" },
     { name = "langgraph-checkpoint" },
     { name = "langgraph-sdk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/55/1b/f79856c25aba7aaec1efe483dd9999c76996a00ddcb2a6d24df1a2bcc9fa/langgraph-0.2.71.tar.gz", hash = "sha256:8cdce67f8b011d2d9df5996553fdcb450b4caa756e6940480617e16f1d7a67f3", size = 129995 }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/18/5a18d8ff3d6d0ba8d81b484907044d9d41cfbf108cb514dea47c34bbbba0/langgraph-0.2.72.tar.gz", hash = "sha256:879cfda4d0a9e9795066f6e448282792d6290f6584f527a7588a64e972e73bad", size = 130129 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/07/58/613784e1f4b3f223e6dcc2a03fb04464296b19278db2c14a728df008477b/langgraph-0.2.71-py3-none-any.whl", hash = "sha256:6cdcf23b37f6580ba93e75f909d1eaefbbf42cd0e0a98be5db17d2377a711362", size = 149991 },
+    { url = "https://files.pythonhosted.org/packages/df/19/722e4573fcf875f46bb364d95985e47418f16bebc464c59955382cfdcd23/langgraph-0.2.72-py3-none-any.whl", hash = "sha256:5b725c02a6eb55257479a0ea0db40926f766c8ff12c2730690f62c614d7e6ee5", size = 150175 },
 ]
 
 [[package]]
 name = "langgraph-checkpoint"
-version = "2.0.12"
+version = "2.0.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "langchain-core" },
     { name = "msgpack" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1e/be/efe00f4f134e77e6e662923be6bd3112655ea530899281ff3343cc7dfe16/langgraph_checkpoint-2.0.12.tar.gz", hash = "sha256:1b7e4967b784e2b66dc38ff6840e929c658c47ee00c28cf0e354b95062060e89", size = 33974 }
+sdist = { url = "https://files.pythonhosted.org/packages/7a/90/b9d783ca81a71de63fb622605f7d7a9ebd456ded98b9c6c0318f51273f90/langgraph_checkpoint-2.0.13.tar.gz", hash = "sha256:5e62d9290b1a74edd19f90624e4a2cfda848be015b484818b650bc7cb307040c", size = 34026 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/d0/6d57970a0c502e10c01f377cfc59401f881b34c496aee46b2ddeebb9178e/langgraph_checkpoint-2.0.12-py3-none-any.whl", hash = "sha256:37e45a9b06ee37b9fe705c1f96f72a4ca1730195ca9553f1c1f49a152dbf21ff", size = 38031 },
+    { url = "https://files.pythonhosted.org/packages/63/21/7b79fab5b9c3b338332a5bb3e8b648696efb84f76c7407dac5aeb5244acd/langgraph_checkpoint-2.0.13-py3-none-any.whl", hash = "sha256:ae022c9f04401d7583442cbf4d649cd48b9767fe6397c8036e4f2a6256309f5c", size = 38099 },
 ]
 
 [[package]]
@@ -2661,8 +2660,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.13.3" },
-    { name = "boto3", specifier = ">=1.36.17" },
-    { name = "botocore", specifier = ">=1.36.17" },
+    { name = "boto3", specifier = ">=1.36.18" },
+    { name = "botocore", specifier = ">=1.36.18" },
     { name = "html2text", specifier = ">=2024.2.26" },
     { name = "langchain", specifier = ">=0.3.18" },
     { name = "langchain-anthropic", specifier = ">=0.3.7" },
@@ -2670,19 +2669,19 @@ requires-dist = [
     { name = "langchain-chroma", specifier = ">=0.2.1" },
     { name = "langchain-community", specifier = ">=0.3.17" },
     { name = "langchain-core", specifier = ">=0.3.34" },
-    { name = "langchain-deepseek", specifier = ">=0.1.1" },
+    { name = "langchain-deepseek", specifier = ">=0.1.2" },
     { name = "langchain-experimental", specifier = ">=0.3.4" },
     { name = "langchain-google-community", specifier = ">=2.0.4" },
     { name = "langchain-google-genai", specifier = ">=2.0.9" },
     { name = "langchain-groq", specifier = ">=0.2.4" },
     { name = "langchain-mistralai", specifier = ">=0.2.6" },
     { name = "langchain-ollama", specifier = ">=0.2.3" },
-    { name = "langchain-openai", specifier = ">=0.3.4" },
+    { name = "langchain-openai", specifier = ">=0.3.5" },
     { name = "langchain-qdrant", specifier = ">=0.2.0" },
     { name = "langchain-text-splitters", specifier = ">=0.3.6" },
     { name = "langchain-xai", specifier = ">=0.2.0" },
-    { name = "langgraph", specifier = ">=0.2.70" },
-    { name = "litellm", specifier = ">=1.60.8" },
+    { name = "langgraph", specifier = ">=0.2.71" },
+    { name = "litellm", specifier = ">=1.61.1" },
     { name = "markdownify", specifier = ">=0.14.1" },
     { name = "orjson", specifier = ">=3.10.15" },
     { name = "playwright", specifier = ">=1.50.0" },
@@ -2718,7 +2717,7 @@ dev = [
 
 [[package]]
 name = "par-scrape"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
