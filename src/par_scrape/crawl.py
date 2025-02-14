@@ -30,11 +30,11 @@ class PageStatus(str, Enum):
     ERROR = "error"
 
 
-def get_url_output_folder(url: str) -> Path:
-    """Get storage folder based on URL's top-level domain and page name."""
+def get_url_output_folder(ticket_id: str, url: str) -> Path:
+    """Get storage folder based on URL's ticket_it, top-level domain, page path and name."""
     extracted = tldextract.extract(url)
-    tld = f"{extracted.domain}.{extracted.suffix}"
-    return PAGES_BASE / tld.replace(".", "_") / urlparse(url).path.strip("/").replace("/", "_")
+    tld = f"{extracted.domain}.{extracted.suffix}".replace(".", "_")
+    return PAGES_BASE / ticket_id / tld / urlparse(url).path.strip("/").replace("/", "__")
 
 
 def extract_links(base_url: str, html: str, crawl_type: CrawlType) -> list[str]:
@@ -74,6 +74,7 @@ def init_db() -> None:
                 status TEXT CHECK(status IN ('queued', 'active', 'completed', 'error')) NOT NULL,
                 error_msg TEXT,
                 scraped INTEGER,
+                attempts INTEGER DEFAULT 0,
                 cost FLOAT,
                 PRIMARY KEY (ticket_id, url)
             )
@@ -97,7 +98,7 @@ def add_to_queue(ticket_id: str, urls: Iterable[str]) -> None:
     """Add URLs to queue if they don't already exist."""
     with sqlite3.connect(DB_PATH) as conn:
         for url in urls:
-            url = url.rstrip('/')
+            url = url.rstrip("/")
             # print(url)
             conn.execute(
                 """
@@ -118,26 +119,23 @@ def add_to_queue(ticket_id: str, urls: Iterable[str]) -> None:
             )
 
 
-def get_next_url(ticket_id: str) -> str | None:
+def get_next_url(ticket_id: str, scrape_retries: int = 3) -> str | None:
     """Get next queued URL from database."""
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(
             """
             SELECT url FROM scrape
-            WHERE ticket_id = ? AND status = ?
+            WHERE ticket_id = ? AND (status = ? or (status = ? AND attempts < ?))
             LIMIT 1
         """,
-            (
-                ticket_id,
-                PageStatus.QUEUED.value,
-            ),
+            (ticket_id, PageStatus.QUEUED.value, PageStatus.ERROR.value, scrape_retries),
         ).fetchone()
         if not row:
             return None
         conn.execute(
             """
             UPDATE scrape
-            SET status = ?
+            SET status = ?, attempts = attempts + 1
             WHERE ticket_id = ? AND url = ?
         """,
             (PageStatus.ACTIVE.value, ticket_id, row[0]),
@@ -151,10 +149,10 @@ def mark_complete(ticket_id: str, url: str, cost: float = 0.0) -> None:
         conn.execute(
             """
             UPDATE scrape
-            SET status = ?, scraped = strftime('%s','now'), cost = ?
+            SET status = ?, scraped = strftime('%s','now'), error_msg = null, cost = ?
             WHERE ticket_id = ? AND url = ?
         """,
-            (PageStatus.COMPLETED.value, cost, ticket_id, url.rstrip('/')),
+            (PageStatus.COMPLETED.value, cost, ticket_id, url.rstrip("/")),
         )
 
 
@@ -167,5 +165,5 @@ def mark_error(ticket_id: str, url: str, error_msg: str, cost: float = 0.0) -> N
             SET status = ?, error_msg = ?, cost = ?
             WHERE ticket_id = ? AND url = ?
         """,
-            (PageStatus.ERROR.value, error_msg[:255], cost, ticket_id, url.rstrip('/')),
+            (PageStatus.ERROR.value, error_msg[:255], cost, ticket_id, url.rstrip("/")),
         )

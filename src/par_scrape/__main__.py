@@ -93,6 +93,10 @@ def main(
             case_sensitive=False,
         ),
     ] = ScraperChoice.PLAYWRIGHT,
+    scrape_retries: Annotated[
+        int,
+        typer.Option("--retries", "-r", help="Retry attempts for failed scrapes"),
+    ] = 3,
     wait_type: Annotated[
         ScraperWaitType,
         typer.Option(
@@ -183,6 +187,10 @@ def main(
             case_sensitive=False,
         ),
     ] = CrawlType.SINGLE_PAGE,
+    crawl_max_pages: Annotated[
+        int,
+        typer.Option("--crawl-max-pages", "-M", help="Maximum number of pages to crawl"),
+    ] = 100,
     version: Annotated[  # pylint: disable=unused-argument
         bool | None,
         typer.Option("--version", "-v", callback=version_callback, is_eager=True),
@@ -333,17 +341,22 @@ def main(
             with get_parai_callback(show_pricing=pricing) as cb:
                 with console_out.status("[bold green]Starting fetch loop...") as status:
                     start_time = time.time()
-
-                    while True:
+                    num_pages: int = 0
+                    while num_pages < crawl_max_pages:
                         status.update(f"[bold cyan]URLs remaining: {get_queue_size(run_name)}")
 
-                        current_url = get_next_url(run_name)
+                        current_url = get_next_url(run_name, scrape_retries)
                         if not current_url:
                             break
+                        num_pages += 1
                         console_out.print(f"[green]{current_url}")
                         try:
                             # Update output folder based on TLD
-                            output_folder = get_url_output_folder(current_url)
+                            output_folder = get_url_output_folder(run_name, current_url)
+                            if llm_needed:
+                                output_folder.mkdir(parents=True, exist_ok=True)
+                            else:
+                                output_folder.parent.mkdir(parents=True, exist_ok=True)
                             console_out.print(f"[green]{output_folder}")
 
                             # Scrape data
@@ -379,7 +392,7 @@ def main(
 
                             # Save raw data
                             status.update("[bold cyan]Saving raw data...")
-                            raw_output_path = save_raw_data(markdown, run_name, output_folder)
+                            raw_output_path = save_raw_data(markdown, output_folder)
 
                             if "Application error" in markdown:
                                 raise ValueError("Application error encountered.")
@@ -423,20 +436,19 @@ def main(
                                         f"[bold red]Invalid output type: {display_output.value}[/bold red]"
                                     )
 
-                            duration = time.time() - start_time
-                            console_out.print(Panel.fit(f"Done in {duration:.2f} seconds."))
-
                             console_out.print("Current session price:")
                             show_llm_cost(cb.usage_metadata, show_pricing=PricingDisplay.PRICE, console=console_out)
                         except Exception as e:  # pylint: disable=broad-except
                             mark_error(run_name, current_url, str(e))
                             console_out.print(f"[bold red]An processing error occurred:[/bold red] {str(e)}")
                     # end while True
+                    duration = time.time() - start_time
+                    console_out.print(Panel.fit(f"Done in {duration:.2f} seconds."))
+                    console_out.print("Grand total:")
                 # end queue_status
             # end get_parai_callback
         except Exception as e:
             console_out.print(f"[bold red]An general error occurred:[/bold red] {str(e)}")
-
         finally:
             if cleanup in [CleanupType.BOTH, CleanupType.AFTER]:
                 with console_out.status("[bold yellow]Cleaning up..."):

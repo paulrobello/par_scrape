@@ -14,23 +14,21 @@ from rich.panel import Panel
 from par_scrape.enums import OutputFormat
 
 
-def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> Path:
+def save_raw_data(raw_data: str, output_base: Path) -> Path:
     """
     Save raw data to a file.
 
     Args:
         raw_data (str): The raw data to save.
-        run_name (str): The run name to use in the filename.
-        output_folder (str, optional): The folder to save the file in. Defaults to 'output'.
+        output_base (str): The folder or base file_name to save the file in. Defaults to 'output'.
 
     Returns:
         Path: The path to the saved file.
     """
-    # Ensure the output folder exists
-    os.makedirs(output_folder, exist_ok=True)
-
-    # Save the raw markdown data with run_name in filename
-    raw_output_path = output_folder / f"raw_data_{run_name}.md"
+    if output_base.is_dir():
+        raw_output_path = output_base / "raw_data.md"
+    else:
+        raw_output_path = Path(str(output_base) + "-raw.md")
     raw_output_path.write_text(raw_data)
     console_out.print(Panel(f"Raw data saved to [bold green]{raw_output_path}[/bold green]"))
     return raw_output_path
