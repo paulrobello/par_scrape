@@ -27,14 +27,16 @@ from rich.text import Text
 
 from par_scrape import __application_title__, __version__
 from par_scrape.crawl import (
+    PAGES_BASE,
     CrawlType,
     add_to_queue,
+    extract_links,
     get_next_url,
     get_queue_size,
-    get_tld_folder,
+    get_url_output_folder,
     init_db,
     mark_complete,
-    mark_error, PAGES_BASE,
+    mark_error,
 )
 from par_scrape.enums import CleanupType, OutputFormat
 from par_scrape.scrape_data import (
@@ -186,7 +188,19 @@ def main(
         typer.Option("--version", "-v", callback=version_callback, is_eager=True),
     ] = None,
 ):
-    """Scrape and analyze data from a website."""
+    """
+    Scrape and optionally crawl / extract data from a website.
+
+    AI is only used if an output format other than md is specified.
+
+    Crawl types:
+
+    - single_page: Only scrape the specified URL.
+
+    - single_level: Scrape the specified URL and all links on that page that are have the same top level domain.
+
+    - domain: Scrape the specified URL and all links and their pages on that page that are have the same domain.
+    """
 
     if display_output and display_output not in output_format:
         console_out.print(
@@ -255,6 +269,7 @@ def main(
         if not run_name:
             run_name = str(uuid4())
 
+    url = url.rstrip("/")
     console_out.print(
         Panel.fit(
             Text.assemble(
@@ -328,12 +343,12 @@ def main(
                         console_out.print(f"[green]{current_url}")
                         try:
                             # Update output folder based on TLD
-                            output_folder = get_tld_folder(current_url)
+                            output_folder = get_url_output_folder(current_url)
                             console_out.print(f"[green]{output_folder}")
 
                             # Scrape data
                             raw_html = fetch_url(
-                                url,
+                                current_url,
                                 fetch_using=ScraperChoice.PLAYWRIGHT.value,
                                 sleep_time=sleep_time,
                                 wait_type=wait_type,
@@ -349,8 +364,13 @@ def main(
                             if not raw_html:
                                 raise ValueError("No data was fetched")
 
-                            # add_to_queue(run_name, extract_links(current_url, raw_html, scrape_type))
-                            # console_out.print(extract_links(current_url, raw_html, crawl_type))
+                            # console_out.print(f"cu:{current_url} -- u:{url}")
+
+                            if (
+                                crawl_type == CrawlType.SINGLE_LEVEL and current_url == url
+                            ) or crawl_type == CrawlType.DOMAIN:
+                                page_links = extract_links(current_url, raw_html, crawl_type)
+                                add_to_queue(run_name, page_links)
                             # break
                             status.update("[bold cyan]Converting HTML to Markdown...")
                             markdown = html_to_markdown(raw_html, url=current_url)
@@ -390,7 +410,7 @@ def main(
                             if OutputFormat.MARKDOWN not in file_paths:
                                 file_paths[OutputFormat.MARKDOWN] = raw_output_path
 
-                            mark_complete(run_name, url)
+                            mark_complete(run_name, current_url)
 
                             # Display output if requested
                             if display_output:
