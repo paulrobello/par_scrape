@@ -2668,7 +2668,6 @@ source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "fastapi" },
-    { name = "html2text" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "par-ai-core" },
@@ -2694,7 +2693,6 @@ dev = [
 requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.13.3" },
     { name = "fastapi", specifier = ">=0.115.8" },
-    { name = "html2text", specifier = ">=2024.2.26" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "par-ai-core", specifier = ">=0.1.18" },

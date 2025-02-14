@@ -10,3 +10,12 @@ class CleanupType(StrEnum):
     BEFORE = "before"
     AFTER = "after"
     BOTH = "both"
+
+
+class OutputFormat(StrEnum):
+    """Enum for output formats."""
+
+    MARKDOWN = "md"
+    JSON = "json"
+    CSV = "csv"
+    EXCEL = "excel"

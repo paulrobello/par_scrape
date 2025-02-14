@@ -11,6 +11,8 @@ from par_ai_core.par_logging import console_out
 from pydantic import BaseModel, ConfigDict, create_model
 from rich.panel import Panel
 
+from par_scrape.enums import OutputFormat
+
 
 def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> Path:
     """
@@ -28,13 +30,13 @@ def save_raw_data(raw_data: str, run_name: str, output_folder: Path) -> Path:
     os.makedirs(output_folder, exist_ok=True)
 
     # Save the raw markdown data with run_name in filename
-    raw_output_path = output_folder / f"rawData_{run_name}.md"
+    raw_output_path = output_folder / f"raw_data_{run_name}.md"
     raw_output_path.write_text(raw_data)
     console_out.print(Panel(f"Raw data saved to [bold green]{raw_output_path}[/bold green]"))
     return raw_output_path
 
 
-def create_dynamic_listing_model(field_names: list[str]) -> type[BaseModel]:
+def create_dynamic_model(field_names: list[str]) -> type[BaseModel]:
     """
     Dynamically creates a Pydantic model based on provided fields.
 
@@ -55,17 +57,17 @@ def create_dynamic_listing_model(field_names: list[str]) -> type[BaseModel]:
     return dynamic_listing_model
 
 
-def create_listings_container_model(listing_model: type[BaseModel]) -> type[BaseModel]:
+def create_container_model(dynamic_model: type[BaseModel]) -> type[BaseModel]:
     """
     Create a container model that holds a list of the given listing model.
 
     Args:
-        listing_model (Type[BaseModel]): The Pydantic model for individual listings.
+        dynamic_model (Type[BaseModel]): The Pydantic model for individual listings.
 
     Returns:
         Type[BaseModel]: A container model for a list of listings.
     """
-    return create_model("DynamicListingsContainer", listings=(list[listing_model], ...))
+    return create_model("DynamicListingsContainer", listings=(list[dynamic_model], ...))
 
 
 # pylint: disable=too-many-positional-arguments
@@ -84,8 +86,8 @@ def format_data(
         data (str): The input data to format.
         dynamic_listings_container (Type[BaseModel]): The Pydantic model to use for parsing.
         llm_config (LlmConfig): The configuration for the AI provider.
+        prompt_cache (bool): Whether to use prompt caching.
         extraction_prompt (Path): Path to the extraction prompt file.
-        ai_base_url (str): The base URL for the AI provider.
 
     Returns:
         BaseModel: The formatted data as a Pydantic model instance.
@@ -128,33 +130,35 @@ def format_data(
 
 
 def save_formatted_data(
-    formatted_data: BaseModel, run_name: str, output_folder: Path
-) -> tuple[pd.DataFrame | None, dict[str, Path]]:
+    *, formatted_data: BaseModel, output_formats: list[OutputFormat], run_name: str, output_folder: Path
+) -> tuple[pd.DataFrame | None, dict[OutputFormat, Path]]:
     """
     Save formatted data to JSON, Excel, CSV, and Markdown files.
 
     Args:
         formatted_data (BaseModel): The formatted data to save.
+        output_formats (List[OutputFormat]): The desired output format.
         run_name (str): The run name to use in the filenames.
         output_folder (str, optional): The folder to save the files in. Defaults to 'output'.
 
     Returns:
-        Tuple[pd.DataFrame | None, Dict[str, str]]: The DataFrame created from the formatted data and a dictionary of
+        Tuple[pd.DataFrame | None, Dict[OutputFormat, Path]]: The DataFrame created from the formatted data and a dictionary of
         file paths, or None and an empty dict if an error occurred.
     """
-    file_paths: dict[str, Path] = {}
+    file_paths: dict[OutputFormat, Path] = {}
     # Ensure the output folder exists
     os.makedirs(output_folder, exist_ok=True)
 
     # Prepare formatted data as a dictionary
     formatted_data_dict = formatted_data.model_dump()
 
-    # Save the formatted data as JSON with run_name in filename
-    json_output_path = output_folder / f"sorted_data_{run_name}.json"
-    json_output_path.write_text(json.dumps(formatted_data_dict, indent=4), encoding="utf-8")
+    if OutputFormat.JSON in output_formats:
+        # Save the formatted data as JSON with run_name in filename
+        json_output_path = output_folder / f"sorted_data_{run_name}.json"
+        json_output_path.write_text(json.dumps(formatted_data_dict, indent=4), encoding="utf-8")
 
-    console_out.print(Panel(f"Formatted data saved to JSON at [bold green]{json_output_path}[/bold green]"))
-    file_paths["json"] = json_output_path
+        console_out.print(Panel(f"Formatted data saved to JSON at [bold green]{json_output_path}[/bold green]"))
+        file_paths[OutputFormat.JSON] = json_output_path
 
     # Prepare data for DataFrame
     if isinstance(formatted_data_dict, dict):
@@ -168,27 +172,44 @@ def save_formatted_data(
     # Create DataFrame
     try:
         df = pd.DataFrame(data_for_df)
-        # Save the DataFrame to an Excel file
-        excel_output_path = output_folder / f"sorted_data_{run_name}.xlsx"
-        df.to_excel(excel_output_path, index=False)
-        console_out.print(Panel(f"Formatted data saved to Excel at [bold green]{excel_output_path}[/bold green]"))
-        file_paths["excel"] = excel_output_path
 
-        # Save the DataFrame to a CSV file
-        csv_output_path = output_folder / f"sorted_data_{run_name}.csv"
-        df.to_csv(csv_output_path, index=False)
-        console_out.print(Panel(f"Formatted data saved to CSV at [bold green]{csv_output_path}[/bold green]"))
-        file_paths["csv"] = csv_output_path
+        if df.empty:
+            raise ValueError("DataFrame is empty, cannot save to files")
 
-        # Save the DataFrame as a Markdown table
-        markdown_output_path = output_folder / f"sorted_data_{run_name}.md"
-        markdown_output_path.write_text(df.to_markdown(index=False) or "", encoding="utf-8")
-        console_out.print(
-            Panel(f"Formatted data saved as Markdown table at [bold green]{markdown_output_path}[/bold green]")
-        )
-        file_paths["md"] = markdown_output_path
+        if OutputFormat.EXCEL in output_formats:
+            try:
+                excel_output_path = output_folder / f"sorted_data_{run_name}.xlsx"
+                df.to_excel(excel_output_path, index=False)
+                console_out.print(
+                    Panel(f"Formatted data saved to Excel at [bold green]{excel_output_path}[/bold green]")
+                )
+                file_paths[OutputFormat.EXCEL] = excel_output_path
+            except Exception as e:
+                console_out.print("[bold red]Error: saving to Excel failed[/bold red]")
+                console_out.print(e)
 
+        if OutputFormat.CSV in output_formats:
+            try:
+                csv_output_path = output_folder / f"sorted_data_{run_name}.csv"
+                df.to_csv(csv_output_path, index=False)
+                console_out.print(Panel(f"Formatted data saved to CSV at [bold green]{csv_output_path}[/bold green]"))
+                file_paths[OutputFormat.CSV] = csv_output_path
+            except Exception as e:
+                console_out.print("[bold red]Error: saving to CSV failed[/bold red]")
+                console_out.print(e)
+
+        if OutputFormat.MARKDOWN in output_formats:
+            try:
+                markdown_output_path = output_folder / f"sorted_data_{run_name}.md"
+                markdown_output_path.write_text(df.to_markdown(index=False) or "", encoding="utf-8")
+                console_out.print(
+                    Panel(f"Formatted data saved as Markdown table at [bold green]{markdown_output_path}[/bold green]")
+                )
+                file_paths[OutputFormat.MARKDOWN] = markdown_output_path
+            except Exception as e:
+                console_out.print("[bold red]Error: saving to Markdown failed[/bold red]")
+                console_out.print(e)
         return df, file_paths
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         console_out.print(f"[bold red]Error creating DataFrame or saving files:[/bold red] {str(e)}")
         return None, {}

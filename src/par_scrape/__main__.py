@@ -30,15 +30,16 @@ from par_scrape.crawl import (
     CrawlType,
     add_to_queue,
     get_next_url,
+    get_queue_size,
     get_tld_folder,
     init_db,
     mark_complete,
-    mark_error,
+    mark_error, PAGES_BASE,
 )
-from par_scrape.enums import CleanupType
+from par_scrape.enums import CleanupType, OutputFormat
 from par_scrape.scrape_data import (
-    create_dynamic_listing_model,
-    create_listings_container_model,
+    create_container_model,
+    create_dynamic_model,
     format_data,
     save_formatted_data,
     save_raw_data,
@@ -73,6 +74,10 @@ def version_callback(value: bool) -> None:
 @app.command()
 def main(
     url: Annotated[str, typer.Option("--url", "-u", help="URL to scrape")] = "https://openai.com/api/pricing/",
+    output_format: Annotated[
+        list[OutputFormat],
+        typer.Option("--output-format", "-O", help="Output format for the scraped data"),
+    ] = [OutputFormat.MARKDOWN],
     fields: Annotated[
         list[str],
         typer.Option("--fields", "-f", help="Fields to extract from the webpage"),
@@ -182,124 +187,151 @@ def main(
     ] = None,
 ):
     """Scrape and analyze data from a website."""
-    if not model:
-        model = provider_default_models[ai_provider]
 
-    if ai_provider not in [LlmProvider.OLLAMA, LlmProvider.BEDROCK, LlmProvider.LITELLM]:
-        key_name = provider_env_key_names[ai_provider]
-        if not os.environ.get(key_name):
-            console_out.print(f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]")
+    if display_output and display_output not in output_format:
+        console_out.print(
+            f"[bold red]Display output format '{display_output}' is not in the specified output formats.[/bold red]"
+        )
+        raise typer.Exit(1)
+
+    outputs_needing_llm = [OutputFormat.JSON, OutputFormat.CSV, OutputFormat.EXCEL]
+    llm_needed = any(format in output_format for format in outputs_needing_llm)
+    if llm_needed:
+        if not model:
+            model = provider_default_models[ai_provider]
+
+        if ai_provider not in [LlmProvider.OLLAMA, LlmProvider.BEDROCK, LlmProvider.LITELLM]:
+            key_name = provider_env_key_names[ai_provider]
+            if not os.environ.get(key_name):
+                console_out.print(f"[bold red]{key_name} environment variable not set. Exiting...[/bold red]")
+                raise typer.Exit(1)
+
+        if prompt_cache and ai_provider != LlmProvider.ANTHROPIC:
+            console_out.print(
+                "[bold red]Prompt cache flag is only available for Anthropic provider. Exiting...[/bold red]"
+            )
             raise typer.Exit(1)
 
-    if prompt_cache and ai_provider != LlmProvider.ANTHROPIC:
-        console_out.print("[bold red]Prompt cache flag is only available for Anthropic provider. Exiting...[/bold red]")
-        raise typer.Exit(1)
+        console_out.print("[bold cyan]Creating llm config and dynamic models...")
+        llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0, base_url=ai_base_url)
+        dynamic_extraction_model = create_dynamic_model(fields)
+        dynamic_model_container = create_container_model(dynamic_extraction_model)
+
+        console_out.print(
+            Panel.fit(
+                Text.assemble(
+                    ("AI Provider: ", "cyan"),
+                    (f"{ai_provider.value}", "green"),
+                    "\n",
+                    ("Model: ", "cyan"),
+                    (f"{model}", "green"),
+                    "\n",
+                    ("AI Provider Base URL: ", "cyan"),
+                    (f"{ai_base_url or 'default'}", "green"),
+                    "\n",
+                    ("Prompt Cache: ", "cyan"),
+                    (f"{prompt_cache}", "green"),
+                    "\n",
+                    ("Fields to extract: ", "cyan"),
+                    (", ".join(fields), "green"),
+                    "\n",
+                    ("Pricing Display: ", "cyan"),
+                    (f"{pricing.value}", "green"),
+                ),
+                title="[bold]AI Configuration",
+                border_style="bold",
+            )
+        )
+    else:
+        llm_config = None
+        dynamic_model_container = None
+
+    # Generate run_name if not provided
+    if not run_name:
+        run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+    else:
+        # Ensure run_name is filesystem-friendly
+        run_name = "".join(c for c in run_name if c.isalnum() or c in ("-", "_"))
+        if not run_name:
+            run_name = str(uuid4())
+
+    console_out.print(
+        Panel.fit(
+            Text.assemble(
+                ("Primary URL: ", "cyan"),
+                (f"{url}", "green"),
+                "\n",
+                ("Scraper: ", "cyan"),
+                (f"{scraper}", "green"),
+                "\n",
+                ("Scrape Type: ", "cyan"),
+                (f"{crawl_type.value}", "green"),
+                "\n",
+                ("Output Format: ", "cyan"),
+                (", ".join([f"{format.value}" for format in output_format]), "green"),
+                "\n",
+                ("Headless: ", "cyan"),
+                (f"{headless}", "green"),
+                "\n",
+                ("Wait Type: ", "cyan"),
+                (f"{wait_type.value}", "green"),
+                "\n",
+                ("Wait Selector: ", "cyan"),
+                (
+                    f"{wait_selector if wait_type in (ScraperWaitType.SELECTOR, ScraperWaitType.TEXT) else 'N/A'}",
+                    "green",
+                ),
+                "\n",
+                ("Sleep Time: ", "cyan"),
+                (
+                    f"{sleep_time} seconds",
+                    "green",
+                ),
+                "\n",
+                ("Display output: ", "cyan"),
+                (f"{display_output or 'None'}", "green"),
+                "\n",
+                ("Silent mode: ", "cyan"),
+                (f"{silent}", "green"),
+                "\n",
+                ("Cleanup: ", "cyan"),
+                (f"{cleanup}", "green"),
+            ),
+            title="[bold]Scraping Configuration",
+            border_style="bold",
+        )
+    )
 
     with console_out.capture() if silent else nullcontext():
         if cleanup in [CleanupType.BEFORE, CleanupType.BOTH]:
             if os.path.exists(output_folder):
                 shutil.rmtree(output_folder)
                 console_out.print(f"[bold green]Removed existing output folder: {output_folder}[/bold green]")
-
-        start_time = time.time()
+            if PAGES_BASE.exists():
+                shutil.rmtree(PAGES_BASE)
+                console_out.print(f"[bold green]Removed existing pages folder: {PAGES_BASE}[/bold green]")
 
         try:
-            # Generate run_name if not provided
-            if not run_name:
-                run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-            else:
-                # Ensure run_name is filesystem-friendly
-                run_name = "".join(c for c in run_name if c.isalnum() or c in ("-", "_"))
-                if not run_name:
-                    run_name = str(uuid4())
-
-            # Display summary of options
             init_db()
             add_to_queue(run_name, [url])
 
-            console_out.print(
-                Panel.fit(
-                    Text.assemble(
-                        (f"{url}", "green"),
-                        "\n",
-                        ("AI Provider: ", "cyan"),
-                        (f"{ai_provider.value}", "green"),
-                        "\n",
-                        ("Model: ", "cyan"),
-                        (f"{model}", "green"),
-                        "\n",
-                        ("AI Provider Base URL: ", "cyan"),
-                        (f"{ai_base_url or 'default'}", "green"),
-                        "\n",
-                        ("Prompt Cache: ", "cyan"),
-                        (f"{prompt_cache}", "green"),
-                        "\n",
-                        ("Scraper: ", "cyan"),
-                        (f"{scraper}", "green"),
-                        "\n",
-                        ("Scrape Type: ", "cyan"),
-                        (f"{crawl_type.value}", "green"),
-                        "\n",
-                        ("Headless: ", "cyan"),
-                        (f"{headless}", "green"),
-                        "\n",
-                        ("Wait Type: ", "cyan"),
-                        (f"{wait_type.value}", "green"),
-                        "\n",
-                        ("Wait Selector: ", "cyan"),
-                        (
-                            f"{wait_selector if wait_type in (ScraperWaitType.SELECTOR, ScraperWaitType.TEXT) else 'N/A'}",
-                            "green",
-                        ),
-                        "\n",
-                        ("Sleep Time: ", "cyan"),
-                        (
-                            f"{sleep_time} seconds",
-                            "green",
-                        ),
-                        "\n",
-                        ("Fields to extract: ", "cyan"),
-                        (", ".join(fields), "green"),
-                        "\n",
-                        ("Display output: ", "cyan"),
-                        (f"{display_output or 'None'}", "green"),
-                        "\n",
-                        ("Pricing Display: ", "cyan"),
-                        (f"{pricing.value}", "green"),
-                        "\n",
-                        ("Silent mode: ", "cyan"),
-                        (f"{silent}", "green"),
-                        "\n",
-                        ("Cleanup: ", "cyan"),
-                        (f"{cleanup}", "green"),
-                    ),
-                    title="[bold]Scraping Configuration",
-                    border_style="bold",
-                )
-            )
-            llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0, base_url=ai_base_url)
-            # Create the dynamic listing model
-            console_out.print("[bold cyan]Creating dynamic models...")
-            dynamic_listing_model = create_dynamic_listing_model(fields)
-            dynamic_listings_container = create_listings_container_model(dynamic_listing_model)
-
-            console_out.print("[bold cyan]Starting fetch loop")
             with get_parai_callback(show_pricing=pricing) as cb:
-                while True:
-                    current_url = get_next_url(run_name)
-                    if not current_url:
-                        break
+                with console_out.status("[bold green]Starting fetch loop...") as status:
+                    start_time = time.time()
 
-                    try:
-                        # Update output folder based on TLD
-                        output_folder = get_tld_folder(current_url)
+                    while True:
+                        status.update(f"[bold cyan]URLs remaining: {get_queue_size(run_name)}")
 
+                        current_url = get_next_url(run_name)
+                        if not current_url:
+                            break
                         console_out.print(f"[green]{current_url}")
-                        console_out.print(f"[green]{output_folder}")
+                        try:
+                            # Update output folder based on TLD
+                            output_folder = get_tld_folder(current_url)
+                            console_out.print(f"[green]{output_folder}")
 
-                        with console_out.status("[bold green]Working on data extraction and processing...") as status:
                             # Scrape data
-                            status.update("[bold cyan]Fetching HTML...")
                             raw_html = fetch_url(
                                 url,
                                 fetch_using=ScraperChoice.PLAYWRIGHT.value,
@@ -322,32 +354,44 @@ def main(
                             # break
                             status.update("[bold cyan]Converting HTML to Markdown...")
                             markdown = html_to_markdown(raw_html, url=current_url)
+                            if not markdown:
+                                raise ValueError("Markdown data is empty")
+
                             # Save raw data
                             status.update("[bold cyan]Saving raw data...")
-                            save_raw_data(markdown, run_name, output_folder)
-
-                            if not markdown:
-                                raise ValueError("No data was fetched")
+                            raw_output_path = save_raw_data(markdown, run_name, output_folder)
 
                             if "Application error" in markdown:
                                 raise ValueError("Application error encountered.")
 
-                            # Format data
-                            status.update("[bold cyan]Formatting data...")
-                            formatted_data = format_data(
-                                data=markdown,
-                                dynamic_listings_container=dynamic_listings_container,
-                                llm_config=llm_config,
-                                prompt_cache=prompt_cache,
-                                extraction_prompt=extraction_prompt,
-                            )
-                            if not formatted_data:
-                                raise ValueError("No data was found by the scrape.")
+                            if llm_needed:
+                                status.update("[bold cyan]Using LLM to extract and format data...")
+                                assert dynamic_model_container and llm_config
+                                formatted_data = format_data(
+                                    data=markdown,
+                                    dynamic_listings_container=dynamic_model_container,
+                                    llm_config=llm_config,
+                                    prompt_cache=prompt_cache,
+                                    extraction_prompt=extraction_prompt,
+                                )
+                                if not formatted_data:
+                                    raise ValueError("No data was found by the scrape.")
 
-                            # Save formatted data
-                            status.update("[bold cyan]Saving formatted data...")
-                            _, file_paths = save_formatted_data(formatted_data, run_name, output_folder)
+                                # Save formatted data
+                                status.update("[bold cyan]Saving formatted data...")
+                                _, file_paths = save_formatted_data(
+                                    formatted_data=formatted_data,
+                                    run_name=run_name,
+                                    output_folder=output_folder,
+                                    output_formats=output_format,
+                                )
+                            else:
+                                file_paths = {}
+                            if OutputFormat.MARKDOWN not in file_paths:
+                                file_paths[OutputFormat.MARKDOWN] = raw_output_path
+
                             mark_complete(run_name, url)
+
                             # Display output if requested
                             if display_output:
                                 if display_output.value in file_paths:
@@ -359,19 +403,19 @@ def main(
                                         f"[bold red]Invalid output type: {display_output.value}[/bold red]"
                                     )
 
-                        duration = time.time() - start_time
-                        console_out.print(Panel.fit(f"Done in {duration:.2f} seconds."))
+                            duration = time.time() - start_time
+                            console_out.print(Panel.fit(f"Done in {duration:.2f} seconds."))
 
-                        console_out.print("Current session price:")
-                        show_llm_cost(cb.usage_metadata, show_pricing=PricingDisplay.PRICE, console=console_out)
-                    except Exception as e:  # pylint: disable=broad-except
-                        mark_error(run_name, current_url, str(e))
-                        console_out.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
-                # end while True
+                            console_out.print("Current session price:")
+                            show_llm_cost(cb.usage_metadata, show_pricing=PricingDisplay.PRICE, console=console_out)
+                        except Exception as e:  # pylint: disable=broad-except
+                            mark_error(run_name, current_url, str(e))
+                            console_out.print(f"[bold red]An processing error occurred:[/bold red] {str(e)}")
+                    # end while True
+                # end queue_status
             # end get_parai_callback
-        except Exception as e:  # pylint: disable=broad-except
-            # print(e)
-            console_out.print(f"[bold red]An error occurred:[/bold red] {str(e)}")
+        except Exception as e:
+            console_out.print(f"[bold red]An general error occurred:[/bold red] {str(e)}")
 
         finally:
             if cleanup in [CleanupType.BOTH, CleanupType.AFTER]:

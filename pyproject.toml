@@ -48,7 +48,6 @@ keywords = [
 ]
 dependencies = [
     "beautifulsoup4>=4.13.3",
-    "html2text>=2024.2.26",
     "pandas>=2.2.3",
     "pydantic>=2.10.6",
     "python-dotenv>=1.0.1",
@@ -110,7 +109,6 @@ include = [
     "**/*.jpg",
     "**/*.png",
     "**/*.md",
-    "**/*.tcss",
 ]
 
 [tool.hatch.build.targets.sdist]
