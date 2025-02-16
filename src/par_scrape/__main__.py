@@ -31,7 +31,7 @@ from par_scrape.crawl import (
     CrawlType,
     add_to_queue,
     extract_links,
-    get_next_url,
+    get_next_urls,
     get_queue_size,
     get_url_output_folder,
     init_db,
@@ -97,6 +97,10 @@ def main(
         int,
         typer.Option("--retries", "-r", help="Retry attempts for failed scrapes"),
     ] = 3,
+    scrape_max_parallel: Annotated[
+        int,
+        typer.Option("--scrape-max-parallel", "-P", help="Max parallel fetch requests"),
+    ] = 1,
     wait_type: Annotated[
         ScraperWaitType,
         typer.Option(
@@ -121,7 +125,7 @@ def main(
     sleep_time: Annotated[
         int,
         typer.Option("--sleep-time", "-t", help="Time to sleep before scrolling (in seconds)"),
-    ] = 3,
+    ] = 2,
     ai_provider: Annotated[
         LlmProvider,
         typer.Option("--ai-provider", "-a", help="AI provider to use for processing"),
@@ -189,8 +193,12 @@ def main(
     ] = CrawlType.SINGLE_PAGE,
     crawl_max_pages: Annotated[
         int,
-        typer.Option("--crawl-max-pages", "-M", help="Maximum number of pages to crawl"),
+        typer.Option("--crawl-max-pages", "-M", help="Maximum number of pages to crawl this session"),
     ] = 100,
+    crawl_batch_size: Annotated[
+        int,
+        typer.Option("--crawl-batch-size", "-b", help="Maximum number of pages to load from the queue at once"),
+    ] = 1,
     version: Annotated[  # pylint: disable=unused-argument
         bool | None,
         typer.Option("--version", "-v", callback=version_callback, is_eager=True),
@@ -287,11 +295,26 @@ def main(
                 ("Scraper: ", "cyan"),
                 (f"{scraper}", "green"),
                 "\n",
-                ("Scrape Type: ", "cyan"),
+                ("Scrape Max Parallel: ", "cyan"),
+                (f"{scrape_max_parallel}", "green"),
+                "\n",
+                ("Retries: ", "cyan"),
+                (
+                    f"{scrape_retries}",
+                    "green",
+                ),
+                "\n",
+                ("Crawl Type: ", "cyan"),
                 (f"{crawl_type.value}", "green"),
+                "\n",
+                ("Crawl Batch Size: ", "cyan"),
+                (f"{crawl_batch_size}", "green"),
                 "\n",
                 ("Output Format: ", "cyan"),
                 (", ".join([f"{format.value}" for format in output_format]), "green"),
+                "\n",
+                ("Max Pages: ", "cyan"),
+                (f"{crawl_max_pages}", "green"),
                 "\n",
                 ("Headless: ", "cyan"),
                 (f"{headless}", "green"),
@@ -338,31 +361,23 @@ def main(
             init_db()
             add_to_queue(run_name, [url])
 
-            with get_parai_callback(show_pricing=pricing) as cb:
+            with get_parai_callback(show_pricing=pricing if llm_needed else PricingDisplay.NONE) as cb:
                 with console_out.status("[bold green]Starting fetch loop...") as status:
                     start_time = time.time()
                     num_pages: int = 0
                     while num_pages < crawl_max_pages:
-                        status.update(f"[bold cyan]URLs remaining: {get_queue_size(run_name)}")
+                        urls = get_next_urls(run_name, crawl_batch_size, scrape_retries)
+                        status.update(f"[bold cyan]URLs remaining: [yellow]{get_queue_size(run_name)}")
 
-                        current_url = get_next_url(run_name, scrape_retries)
-                        if not current_url:
+                        if not urls:
                             break
-                        num_pages += 1
-                        console_out.print(f"[green]{current_url}")
-                        try:
-                            # Update output folder based on TLD
-                            output_folder = get_url_output_folder(run_name, current_url)
-                            if llm_needed:
-                                output_folder.mkdir(parents=True, exist_ok=True)
-                            else:
-                                output_folder.parent.mkdir(parents=True, exist_ok=True)
-                            console_out.print(f"[green]{output_folder}")
+                        num_pages += len(urls)
 
-                            # Scrape data
-                            raw_html = fetch_url(
-                                current_url,
-                                fetch_using=ScraperChoice.PLAYWRIGHT.value,
+                        try:
+                            raw_htmls = fetch_url(
+                                urls,
+                                fetch_using=scraper.value,
+                                max_parallel=scrape_max_parallel,
                                 sleep_time=sleep_time,
                                 wait_type=wait_type,
                                 wait_selector=wait_selector,
@@ -370,81 +385,118 @@ def main(
                                 verbose=True,
                                 console=console_out,
                             )
-                            if not raw_html:
-                                raise ValueError("No data was fetched")
-                            else:
-                                raw_html = raw_html[0]
-                            if not raw_html:
+                            if not raw_htmls:
                                 raise ValueError("No data was fetched")
 
-                            # console_out.print(f"cu:{current_url} -- u:{url}")
+                            if len(raw_htmls) != len(urls):
+                                raise ValueError(f"Mismatch between URLs {len(urls)} and fetched data {len(raw_htmls)}")
+                            url_data = zip(urls, raw_htmls)
+                            for current_url, raw_html in url_data:
+                                try:
+                                    console_out.print(f"[green]{current_url}")
 
-                            if (
-                                crawl_type == CrawlType.SINGLE_LEVEL and current_url == url
-                            ) or crawl_type == CrawlType.DOMAIN:
-                                page_links = extract_links(current_url, raw_html, crawl_type)
-                                add_to_queue(run_name, page_links)
-                            # break
-                            status.update("[bold cyan]Converting HTML to Markdown...")
-                            markdown = html_to_markdown(raw_html, url=current_url)
-                            if not markdown:
-                                raise ValueError("Markdown data is empty")
+                                    output_folder = get_url_output_folder(run_name, current_url)
+                                    if llm_needed:
+                                        output_folder.mkdir(parents=True, exist_ok=True)
+                                    else:
+                                        output_folder.parent.mkdir(parents=True, exist_ok=True)
+                                    # console_out.print(f"[green]{output_folder}")
 
-                            # Save raw data
-                            status.update("[bold cyan]Saving raw data...")
-                            raw_output_path = save_raw_data(markdown, output_folder)
+                                    if not raw_html:
+                                        raise ValueError("No data was fetched")
 
-                            if "Application error" in markdown:
-                                raise ValueError("Application error encountered.")
+                                    # console_out.print(f"cu:{current_url} -- u:{url}")
 
-                            if llm_needed:
-                                status.update("[bold cyan]Using LLM to extract and format data...")
-                                assert dynamic_model_container and llm_config
-                                formatted_data = format_data(
-                                    data=markdown,
-                                    dynamic_listings_container=dynamic_model_container,
-                                    llm_config=llm_config,
-                                    prompt_cache=prompt_cache,
-                                    extraction_prompt=extraction_prompt,
-                                )
-                                if not formatted_data:
-                                    raise ValueError("No data was found by the scrape.")
+                                    if (
+                                        crawl_type == CrawlType.SINGLE_LEVEL and current_url == url
+                                    ) or crawl_type == CrawlType.DOMAIN:
+                                        page_links = extract_links(current_url, raw_html, crawl_type)
+                                        add_to_queue(run_name, page_links)
+                                    # break
+                                    status.update("[bold cyan]Converting HTML to Markdown...")
+                                    markdown = html_to_markdown(raw_html, url=current_url, include_images=True)
+                                    if not markdown:
+                                        raise ValueError("Markdown data is empty")
 
-                                # Save formatted data
-                                status.update("[bold cyan]Saving formatted data...")
-                                _, file_paths = save_formatted_data(
-                                    formatted_data=formatted_data,
-                                    run_name=run_name,
-                                    output_folder=output_folder,
-                                    output_formats=output_format,
-                                )
-                            else:
-                                file_paths = {}
-                            if OutputFormat.MARKDOWN not in file_paths:
-                                file_paths[OutputFormat.MARKDOWN] = raw_output_path
+                                    # Save raw data
+                                    status.update("[bold cyan]Saving raw data...")
+                                    raw_output_path = save_raw_data(markdown, output_folder)
 
-                            mark_complete(run_name, current_url)
+                                    if "Application error" in markdown:
+                                        raise ValueError("Application error encountered.")
 
-                            # Display output if requested
-                            if display_output:
-                                if display_output.value in file_paths:
-                                    with open(file_paths[display_output.value], encoding="utf-8") as f:
-                                        content = f.read()
-                                    display_formatted_output(content, display_output, console_out)
-                                else:
-                                    console_out.print(
-                                        f"[bold red]Invalid output type: {display_output.value}[/bold red]"
+                                    if llm_needed:
+                                        status.update("[bold cyan]Extracting data with LLM...")
+                                        assert dynamic_model_container and llm_config
+                                        formatted_data = format_data(
+                                            data=markdown,
+                                            dynamic_listings_container=dynamic_model_container,
+                                            llm_config=llm_config,
+                                            prompt_cache=prompt_cache,
+                                            extraction_prompt=extraction_prompt,
+                                        )
+                                        if not formatted_data:
+                                            raise ValueError("No data was found by the LLM.")
+
+                                        # Save formatted data
+                                        status.update("[bold cyan]Saving extracted data...")
+                                        _, file_paths = save_formatted_data(
+                                            formatted_data=formatted_data,
+                                            run_name=run_name,
+                                            output_folder=output_folder,
+                                            output_formats=output_format,
+                                        )
+                                    else:
+                                        file_paths = {}
+                                    if OutputFormat.MARKDOWN not in file_paths:
+                                        file_paths[OutputFormat.MARKDOWN] = raw_output_path
+
+                                    mark_complete(
+                                        run_name,
+                                        current_url,
+                                        raw_file_path=raw_output_path,
+                                        file_paths=file_paths,
                                     )
 
-                            console_out.print("Current session price:")
-                            show_llm_cost(cb.usage_metadata, show_pricing=PricingDisplay.PRICE, console=console_out)
-                        except Exception as e:  # pylint: disable=broad-except
+                                    # Display output if requested
+                                    if display_output:
+                                        if display_output.value in file_paths:
+                                            content = file_paths[display_output.value].read_text()
+                                            display_formatted_output(content, display_output, console_out)
+                                        else:
+                                            console_out.print(
+                                                f"[bold red]Invalid output type: {display_output.value}[/bold red]"
+                                            )
+                                    if llm_needed:
+                                        console_out.print("Current session price:")
+                                        show_llm_cost(
+                                            cb.usage_metadata, show_pricing=PricingDisplay.PRICE, console=console_out
+                                        )
+
+                                    console_out.print(
+                                        Panel.fit(
+                                            "\n".join([str(p) for p in file_paths.values()] + [str(raw_output_path)]),
+                                            title="Files",
+                                        )
+                                    )
+                                except Exception as e:
+                                    mark_error(run_name, current_url, str(e))
+                                    console_out.print(
+                                        f"[bold red]URL processing error:[/bold red][blue]{current_url}[/blue] {str(e)}"
+                                    )
+                        except Exception as e:
                             mark_error(run_name, current_url, str(e))
-                            console_out.print(f"[bold red]An processing error occurred:[/bold red] {str(e)}")
-                    # end while True
+                            console_out.print(f"[bold red]A fetch error occurred:[/bold red] {str(e)}")
+                    # end while num_pages < crawl_max_pages
                     duration = time.time() - start_time
-                    console_out.print(Panel.fit(f"Done in {duration:.2f} seconds."))
-                    console_out.print("Grand total:")
+                    console_out.print(
+                        Panel.fit(
+                            f"Pages {num_pages} in {duration:.1f} seconds. {num_pages / duration:.1f} pages per second."
+                        )
+                    )
+                    if llm_needed:
+                        console_out.print("Grand total:")
+
                 # end queue_status
             # end get_parai_callback
         except Exception as e:

@@ -8,7 +8,10 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 from par_ai_core.web_tools import normalize_url
-from tldextract import tldextract
+
+from par_scrape.enums import OutputFormat
+
+# from tldextract import tldextract
 
 # BASE_PATH = Path("~/.par_scrape").expanduser()
 BASE_PATH = Path(__file__).parent  # debug path
@@ -31,10 +34,10 @@ class PageStatus(str, Enum):
 
 
 def get_url_output_folder(ticket_id: str, url: str) -> Path:
-    """Get storage folder based on URL's ticket_it, top-level domain, page path and name."""
-    extracted = tldextract.extract(url)
-    tld = f"{extracted.domain}.{extracted.suffix}".replace(".", "_")
-    return PAGES_BASE / ticket_id / tld / urlparse(url).path.strip("/").replace("/", "__")
+    """Get storage folder based on URL and ticket_id."""
+    # extracted = tldextract.extract(url)
+    # tld = f"{extracted.domain}.{extracted.suffix}".replace(".", "_")
+    return PAGES_BASE / ticket_id / urlparse(url).path.strip("/").replace("/", "__")
 
 
 def extract_links(base_url: str, html: str, crawl_type: CrawlType) -> list[str]:
@@ -73,6 +76,11 @@ def init_db() -> None:
                 url TEXT,
                 status TEXT CHECK(status IN ('queued', 'active', 'completed', 'error')) NOT NULL,
                 error_msg TEXT,
+                raw_file_path TEXT,
+                md_file_path TEXT,
+                json_file_path TEXT,
+                csv_file_path TEXT,
+                excel_file_path TEXT,
                 scraped INTEGER,
                 attempts INTEGER DEFAULT 0,
                 cost FLOAT,
@@ -119,40 +127,56 @@ def add_to_queue(ticket_id: str, urls: Iterable[str]) -> None:
             )
 
 
-def get_next_url(ticket_id: str, scrape_retries: int = 3) -> str | None:
+def get_next_urls(ticket_id: str, crawl_batch_size: int = 1, scrape_retries: int = 3) -> list[str]:
     """Get next queued URL from database."""
     with sqlite3.connect(DB_PATH) as conn:
-        row = conn.execute(
+        rows = conn.execute(
             """
             SELECT url FROM scrape
             WHERE ticket_id = ? AND (status = ? or (status = ? AND attempts < ?))
-            LIMIT 1
+            LIMIT ?
         """,
-            (ticket_id, PageStatus.QUEUED.value, PageStatus.ERROR.value, scrape_retries),
-        ).fetchone()
-        if not row:
-            return None
+            (ticket_id, PageStatus.QUEUED.value, PageStatus.ERROR.value, scrape_retries, crawl_batch_size),
+        ).fetchall()
+        if not rows:
+            return []
+        urls = [row[0] for row in rows]
+        placeholders = ", ".join("?" for _ in urls)
         conn.execute(
-            """
+            f"""
             UPDATE scrape
             SET status = ?, attempts = attempts + 1
-            WHERE ticket_id = ? AND url = ?
+            WHERE ticket_id = ? AND url in ({placeholders})
         """,
-            (PageStatus.ACTIVE.value, ticket_id, row[0]),
+            [PageStatus.ACTIVE.value, ticket_id] + urls,
         )
-        return row[0]
+        return urls
 
 
-def mark_complete(ticket_id: str, url: str, cost: float = 0.0) -> None:
+def mark_complete(
+    ticket_id: str, url: str, *, raw_file_path: Path, file_paths: dict[OutputFormat, Path], cost: float = 0.0
+) -> None:
     """Mark URL as successfully scraped."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
             UPDATE scrape
-            SET status = ?, scraped = strftime('%s','now'), error_msg = null, cost = ?
+            SET status = ?, scraped = strftime('%s','now'), error_msg = null,
+            raw_file_path = ?, md_file_path = ?, json_file_path = ?, csv_file_path = ?, excel_file_path = ?,
+            cost = ?
             WHERE ticket_id = ? AND url = ?
         """,
-            (PageStatus.COMPLETED.value, cost, ticket_id, url.rstrip("/")),
+            (
+                PageStatus.COMPLETED.value,
+                str(raw_file_path),
+                str(file_paths[OutputFormat.MARKDOWN]),
+                str(file_paths[OutputFormat.JSON]) if OutputFormat.JSON in file_paths else None,
+                str(file_paths[OutputFormat.CSV]) if OutputFormat.CSV in file_paths else None,
+                str(file_paths[OutputFormat.EXCEL]) if OutputFormat.EXCEL in file_paths else None,
+                cost,
+                ticket_id,
+                url.rstrip("/"),
+            ),
         )
 
 

@@ -88,7 +88,7 @@ def format_data(
         extraction_prompt (Path): Path to the extraction prompt file.
 
     Returns:
-        BaseModel: The formatted data as a Pydantic model instance.
+        BaseModel: The Extracted data as a Pydantic model instance.
     """
     if not extraction_prompt:
         extraction_prompt = Path(__file__).parent / "extraction_prompt.md"
@@ -131,31 +131,31 @@ def save_formatted_data(
     *, formatted_data: BaseModel, output_formats: list[OutputFormat], run_name: str, output_folder: Path
 ) -> tuple[pd.DataFrame | None, dict[OutputFormat, Path]]:
     """
-    Save formatted data to JSON, Excel, CSV, and Markdown files.
+    Save Extracted data to JSON, Excel, CSV, and Markdown files.
 
     Args:
-        formatted_data (BaseModel): The formatted data to save.
+        formatted_data (BaseModel): The Extracted data to save.
         output_formats (List[OutputFormat]): The desired output format.
         run_name (str): The run name to use in the filenames.
         output_folder (str, optional): The folder to save the files in. Defaults to 'output'.
 
     Returns:
-        Tuple[pd.DataFrame | None, Dict[OutputFormat, Path]]: The DataFrame created from the formatted data and a dictionary of
+        Tuple[pd.DataFrame | None, Dict[OutputFormat, Path]]: The DataFrame created from the Extracted data and a dictionary of
         file paths, or None and an empty dict if an error occurred.
     """
     file_paths: dict[OutputFormat, Path] = {}
     # Ensure the output folder exists
     os.makedirs(output_folder, exist_ok=True)
 
-    # Prepare formatted data as a dictionary
+    # Prepare Extracted data as a dictionary
     formatted_data_dict = formatted_data.model_dump()
 
     if OutputFormat.JSON in output_formats:
-        # Save the formatted data as JSON with run_name in filename
-        json_output_path = output_folder / f"sorted_data_{run_name}.json"
+        # Save the Extracted data as JSON with run_name in filename
+        json_output_path = output_folder / f"extracted_data_{run_name}.json"
         json_output_path.write_text(json.dumps(formatted_data_dict, indent=4), encoding="utf-8")
 
-        console_out.print(Panel(f"Formatted data saved to JSON at [bold green]{json_output_path}[/bold green]"))
+        console_out.print(Panel(f"Extracted data saved to JSON at [bold green]{json_output_path}[/bold green]"))
         file_paths[OutputFormat.JSON] = json_output_path
 
     # Prepare data for DataFrame
@@ -165,7 +165,7 @@ def save_formatted_data(
     elif isinstance(formatted_data_dict, list):
         data_for_df = formatted_data_dict
     else:
-        raise ValueError("Formatted data is neither a dictionary nor a list, cannot convert to DataFrame")
+        raise ValueError("Extracted data is neither a dictionary nor a list, cannot convert to DataFrame")
 
     # Create DataFrame
     try:
@@ -176,36 +176,32 @@ def save_formatted_data(
 
         if OutputFormat.EXCEL in output_formats:
             try:
-                excel_output_path = output_folder / f"sorted_data_{run_name}.xlsx"
+                excel_output_path = output_folder / f"extracted_data_{run_name}.xlsx"
                 df.to_excel(excel_output_path, index=False)
-                console_out.print(
-                    Panel(f"Formatted data saved to Excel at [bold green]{excel_output_path}[/bold green]")
-                )
+                console_out.print(Panel(f"Excel data saved to [bold green]{excel_output_path}[/bold green]"))
                 file_paths[OutputFormat.EXCEL] = excel_output_path
             except Exception as e:
-                console_out.print("[bold red]Error: saving to Excel failed[/bold red]")
+                console_out.print("[bold red]Error: Saving Excel failed[/bold red]")
                 console_out.print(e)
 
         if OutputFormat.CSV in output_formats:
             try:
-                csv_output_path = output_folder / f"sorted_data_{run_name}.csv"
+                csv_output_path = output_folder / f"extracted_data_{run_name}.csv"
                 df.to_csv(csv_output_path, index=False)
-                console_out.print(Panel(f"Formatted data saved to CSV at [bold green]{csv_output_path}[/bold green]"))
+                console_out.print(Panel(f"CSV data saved to [bold green]{csv_output_path}[/bold green]"))
                 file_paths[OutputFormat.CSV] = csv_output_path
             except Exception as e:
-                console_out.print("[bold red]Error: saving to CSV failed[/bold red]")
+                console_out.print("[bold red]Error: Saving CSV failed[/bold red]")
                 console_out.print(e)
 
         if OutputFormat.MARKDOWN in output_formats:
             try:
-                markdown_output_path = output_folder / f"sorted_data_{run_name}.md"
+                markdown_output_path = output_folder / f"extracted_data_{run_name}.md"
                 markdown_output_path.write_text(df.to_markdown(index=False) or "", encoding="utf-8")
-                console_out.print(
-                    Panel(f"Formatted data saved as Markdown table at [bold green]{markdown_output_path}[/bold green]")
-                )
+                console_out.print(Panel(f"Markdown table saved to [bold green]{markdown_output_path}[/bold green]"))
                 file_paths[OutputFormat.MARKDOWN] = markdown_output_path
             except Exception as e:
-                console_out.print("[bold red]Error: saving to Markdown failed[/bold red]")
+                console_out.print("[bold red]Error: Saving Markdown table failed[/bold red]")
                 console_out.print(e)
         return df, file_paths
     except Exception as e:

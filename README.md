@@ -210,6 +210,7 @@ par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Descript
 
 ## Whats New
 - Version 0.6.0
+  - Fixed bug where images were being striped from markdown output
   - Now uses par_ai_core for url fetching and markdown conversion
   - Updated system prompt for better results
   - Now supports site crawling
