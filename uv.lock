@@ -1502,7 +1502,7 @@ wheels = [
 
 [[package]]
 name = "langchain"
-version = "0.3.18"
+version = "0.3.19"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1517,9 +1517,9 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tenacity" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/87/23/612d99c74889f672fe349f43a458a42e449650ebd57073b9e96e0b6b2253/langchain-0.3.18.tar.gz", hash = "sha256:311ac227a995545ff7c3f74c7767930c5349edef0b39f19d3105b86d39316b69", size = 10223807 }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/cf/a064ef27d5f3154491c85783590a25d7ae22340cddedf9bf47496044e4eb/langchain-0.3.19.tar.gz", hash = "sha256:b96f8a445f01d15d522129ffe77cc89c8468dbd65830d153a676de8f6b899e7b", size = 10224228 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/83/a4b41a1cf8b22fd708104d50edf98b720aa28647d3083d83b8348927a786/langchain-0.3.18-py3-none-any.whl", hash = "sha256:1a6e629f02a25962aa5b16932e8f073248104a66804ed5af1f78618ad7c1d38d", size = 1010321 },
+    { url = "https://files.pythonhosted.org/packages/18/7d/0f4cc3317634195381f87c5d90268f29b9a31fda62aa7a7f36a1c27b06f3/langchain-0.3.19-py3-none-any.whl", hash = "sha256:1e16d97db9106640b7de4c69f8f5ed22eeda56b45b9241279e83f111640eff16", size = 1010630 },
 ]
 
 [[package]]
@@ -2308,7 +2308,7 @@ wheels = [
 
 [[package]]
 name = "openai"
-version = "1.63.0"
+version = "1.63.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -2320,9 +2320,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4f/32/2049e973a646801df425aecdf88c6504ca878bdb3951fe12076fc30f2977/openai-1.63.0.tar.gz", hash = "sha256:597d7a1b35b113e5a09fcb953bdb1eef44f404a39985f3d7573b3ab09221fd66", size = 356710 }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/1c/11b520deb71f9ea54ced3c52cd6a5f7131215deba63ad07f23982e328141/openai-1.63.2.tar.gz", hash = "sha256:aeabeec984a7d2957b4928ceaa339e2ead19c61cfcf35ae62b7c363368d26360", size = 356902 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/a0/e1fe4e87218639fc0a0927da5266c2978eaa0e2eb5437479ee64a11535bb/openai-1.63.0-py3-none-any.whl", hash = "sha256:a664dfc78f0a05ca46c3e21f344f840cf6bf7174f13cfa9de214ed28bfca1dda", size = 472282 },
+    { url = "https://files.pythonhosted.org/packages/15/64/db3462b358072387b8e93e6e6a38d3c741a17b4a84171ef01d6c85c63f25/openai-1.63.2-py3-none-any.whl", hash = "sha256:1f38b27b5a40814c2b7d8759ec78110df58c4a614c25f182809ca52b080ff4d4", size = 472282 },
 ]
 
 [[package]]
@@ -2615,8 +2615,8 @@ wheels = [
 
 [[package]]
 name = "par-ai-core"
-version = "0.1.19"
-source = { editable = "../par_ai_core" }
+version = "0.1.20"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "boto3" },
@@ -2656,63 +2656,9 @@ dependencies = [
     { name = "webdriver-manager" },
     { name = "youtube-transcript-api" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "beautifulsoup4", specifier = ">=4.13.3" },
-    { name = "boto3", specifier = ">=1.36.18" },
-    { name = "botocore", specifier = ">=1.36.18" },
-    { name = "html2text", specifier = ">=2024.2.26" },
-    { name = "langchain", specifier = ">=0.3.18" },
-    { name = "langchain-anthropic", specifier = ">=0.3.7" },
-    { name = "langchain-aws", specifier = ">=0.2.12" },
-    { name = "langchain-chroma", specifier = ">=0.2.1" },
-    { name = "langchain-community", specifier = ">=0.3.17" },
-    { name = "langchain-core", specifier = ">=0.3.34" },
-    { name = "langchain-deepseek", specifier = ">=0.1.2" },
-    { name = "langchain-experimental", specifier = ">=0.3.4" },
-    { name = "langchain-google-community", specifier = ">=2.0.4" },
-    { name = "langchain-google-genai", specifier = ">=2.0.9" },
-    { name = "langchain-groq", specifier = ">=0.2.4" },
-    { name = "langchain-mistralai", specifier = ">=0.2.6" },
-    { name = "langchain-ollama", specifier = ">=0.2.3" },
-    { name = "langchain-openai", specifier = ">=0.3.5" },
-    { name = "langchain-qdrant", specifier = ">=0.2.0" },
-    { name = "langchain-text-splitters", specifier = ">=0.3.6" },
-    { name = "langchain-xai", specifier = ">=0.2.0" },
-    { name = "langgraph", specifier = ">=0.2.71" },
-    { name = "litellm", specifier = ">=1.61.1" },
-    { name = "markdownify", specifier = ">=0.14.1" },
-    { name = "orjson", specifier = ">=3.10.15" },
-    { name = "playwright", specifier = ">=1.50.0" },
-    { name = "praw", specifier = ">=7.8.1" },
-    { name = "pydantic", specifier = ">=2.10.6" },
-    { name = "pydantic-core", specifier = ">=2.27.2" },
-    { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "requests", specifier = ">=2.32.3" },
-    { name = "rich", specifier = ">=13.9.4" },
-    { name = "selenium", specifier = ">=4.28.1" },
-    { name = "strenum", specifier = ">=0.4.15" },
-    { name = "tavily-python", specifier = ">=0.5.1" },
-    { name = "webdriver-manager", specifier = ">=4.0.2" },
-    { name = "youtube-transcript-api", specifier = ">=0.6.3" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "build", specifier = ">=1.2.1" },
-    { name = "pdoc3", specifier = ">=0.11.5" },
-    { name = "pre-commit", specifier = ">=3.8.0" },
-    { name = "pyinstrument", specifier = ">=5.0.0" },
-    { name = "pyright", specifier = ">=1.1.379" },
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23.5" },
-    { name = "pytest-cov", specifier = ">=4.1.0" },
-    { name = "pytest-mock", specifier = ">=3.14.0" },
-    { name = "pytest-xdist", specifier = ">=3.6.1" },
-    { name = "ruff", specifier = ">=0.7.0" },
-    { name = "twine", specifier = ">=5.1.1" },
-    { name = "types-orjson", specifier = ">=3.6.2" },
+sdist = { url = "https://files.pythonhosted.org/packages/d1/10/fc87376522c99eb6728bff3395fa25c81d131c9bb38c7fc67f0dd32b0c85/par_ai_core-0.1.20.tar.gz", hash = "sha256:72ceebedbdf6e8ce3fb629d4c3ef8d9cabf6c54c7e12ad37b5e261a44c952884", size = 121127 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ab/83/ad7054de30284580035e48e60ae9162aba93e5ee33b73a7c97a8fa655d9e/par_ai_core-0.1.20-py3-none-any.whl", hash = "sha256:2df568709f4926ba3f6222b98facb7c771e07ac475e3e51602db6476b2b021e2", size = 160259 },
 ]
 
 [[package]]
@@ -2749,7 +2695,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.8" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.2.3" },
-    { name = "par-ai-core", editable = "../par_ai_core" },
+    { name = "par-ai-core", specifier = ">=0.1.20" },
     { name = "pydantic", specifier = ">=2.10.6" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "rich", specifier = ">=13.9.4" },
@@ -3939,16 +3885,16 @@ wheels = [
 
 [[package]]
 name = "trio-websocket"
-version = "0.11.1"
+version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
     { name = "trio" },
     { name = "wsproto" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dd/36/abad2385853077424a11b818d9fd8350d249d9e31d583cb9c11cd4c85eda/trio-websocket-0.11.1.tar.gz", hash = "sha256:18c11793647703c158b1f6e62de638acada927344d534e3c7628eedcb746839f", size = 26511 }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/7f/75dc83abe5631353068629c82d8535e2fd4d457d6fe582bf5ff63c48dd41/trio_websocket-0.12.0.tar.gz", hash = "sha256:d9bc17ee061c66c9abf62a08fe9f36949ad6be17eed281c3b979be9293f3df74", size = 33499 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/be/a9ae5f50cad5b6f85bd2574c2c923730098530096e170c1ce7452394d7aa/trio_websocket-0.11.1-py3-none-any.whl", hash = "sha256:520d046b0d030cf970b8b2b2e00c4c2245b3807853ecd44214acd33d74581638", size = 17408 },
+    { url = "https://files.pythonhosted.org/packages/f7/21/1e1b12eaef2760e7fff02a4f34c9af7d9436d4d6cfdfa1389ca9933825a0/trio_websocket-0.12.0-py3-none-any.whl", hash = "sha256:d50abf361d94d72ffc5151502e5ac11dae4782f1515f8a9e4a4d0971b82f793b", size = 21206 },
 ]
 
 [[package]]
