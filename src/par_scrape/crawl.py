@@ -13,10 +13,10 @@ from par_scrape.enums import OutputFormat
 
 # from tldextract import tldextract
 
-# BASE_PATH = Path("~/.par_scrape").expanduser()
-BASE_PATH = Path(__file__).parent  # debug path
+BASE_PATH = Path("~/.par_scrape").expanduser()
+# BASE_PATH = Path(__file__).parent  # debug path
 DB_PATH = BASE_PATH / "jobs.sqlite"
-PAGES_BASE = BASE_PATH / "pages"
+# PAGES_BASE = BASE_PATH / "pages"
 
 
 class CrawlType(str, Enum):
@@ -33,11 +33,11 @@ class PageStatus(str, Enum):
     ERROR = "error"
 
 
-def get_url_output_folder(ticket_id: str, url: str) -> Path:
+def get_url_output_folder(output_path: Path, ticket_id: str, url: str) -> Path:
     """Get storage folder based on URL and ticket_id."""
     # extracted = tldextract.extract(url)
     # tld = f"{extracted.domain}.{extracted.suffix}".replace(".", "_")
-    return PAGES_BASE / ticket_id / urlparse(url).path.strip("/").replace("/", "__")
+    return output_path / ticket_id / urlparse(url).path.strip("/").replace("/", "__")
 
 
 def extract_links(base_url: str, html: str, crawl_type: CrawlType) -> list[str]:

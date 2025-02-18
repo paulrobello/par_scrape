@@ -27,7 +27,6 @@ from rich.text import Text
 
 from par_scrape import __application_title__, __version__
 from par_scrape.crawl import (
-    PAGES_BASE,
     CrawlType,
     add_to_queue,
     extract_links,
@@ -357,10 +356,6 @@ def main(
             if os.path.exists(output_folder):
                 shutil.rmtree(output_folder)
                 console_out.print(f"[bold green]Removed existing output folder: {output_folder}[/bold green]")
-            if PAGES_BASE.exists():
-                shutil.rmtree(PAGES_BASE)
-                console_out.print(f"[bold green]Removed existing pages folder: {PAGES_BASE}[/bold green]")
-
         try:
             init_db()
             add_to_queue(run_name, [url])
@@ -399,7 +394,7 @@ def main(
                                 try:
                                     console_out.print(f"[green]{current_url}")
 
-                                    output_folder = get_url_output_folder(run_name, current_url)
+                                    output_folder = get_url_output_folder(output_folder, run_name, current_url)
                                     if llm_needed:
                                         output_folder.mkdir(parents=True, exist_ok=True)
                                     else:
