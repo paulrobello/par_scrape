@@ -168,7 +168,11 @@ def main(
     ] = False,
     run_name: Annotated[
         str,
-        typer.Option("--run-name", "-n", help="Specify a name for this run"),
+        typer.Option(
+            "--run-name",
+            "-n",
+            help="Specify a name for this run. Can be used to resume a crawl Defaults to YYYYmmdd_HHMMSS",
+        ),
     ] = "",
     pricing: Annotated[
         PricingDisplay,
