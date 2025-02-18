@@ -27,11 +27,33 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 ## Known Issues
 - Selenium silent mode on windows still shows message about websocket. There is no simple way to get rid of this.
 - Providers other than OpenAI are hit-and-miss depending on provider / model / data being extracted.
-- OpenRouter pricing display not available.
 
 ## Prompt Cache
 - OpenAI will auto cache prompts that are over 1024 tokens.
 - Anthropic will only cache prompts if you specify the --prompt-cache flag. Due to cache writes costing more only enable this if you intend to run multiple scrape jobs against the same url, also the cache will go stale within a couple of minutes so to reduce cost run your jobs as close together as possible.
+
+## How it works
+- Data is fetch from the site using either Selenium or Playwright
+- HTML is converted to clean markdown
+- If you specify an output format other than markdown then the following kicks in:
+  - A pydantic model is constructed from the fields you specify
+  - The markdown is sent to the AI provider with the pydantic model as the the required output
+  - The structured output is saved in the specified formats
+- If crawling mode is enabled this process is repeated for each page in the queue until the specified max number of pages is reached
+
+## Site Crawling
+
+Crawling currently comes in 3 modes:
+- Single page which is the default
+- Single level which will crawl all links on the first page and add them to the queue. Links from any pages after the first are not added to the queue
+- Domain which will crawl all links on all pages as long as they below to the same top level domain (TLD).
+- Paginated will be added soon
+
+Crawling progress is stored in a sqlite database and all pages are tagged with the run name which can be specified with the --run-name / -n flag.  
+You can resume a crawl by specifying the same run name again.  
+The options `--scrape-max-parallel` / `-P` can be used to increase the scraping speed by running multiple scrapes in parallel.  
+The options `--crawl-batch-size` / `-b` should be set at least as high as the scrape max parallel option to ensure that the queue is always full.
+The options `--crawl-max-pages` / `-M` can be used to limit the total number of pages crawled in a single run.
 
 ## Prerequisites
 
@@ -150,70 +172,93 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 
 ### Options
 ```
---url                 -u      TEXT                                                                     URL to scrape [default: https://openai.com/api/pricing/]]
---fields              -f      TEXT                                                                     Fields to extract from the webpage [default: Model, Pricing Input, Pricing Output, Cache Price]
---scraper             -s      [selenium|playwright]                                                    Scraper to use: 'selenium' or 'playwright' [default: playwright]
---wait-type           -w      [none|pause|sleep|idle|selector|text]                                    Method to use for page content load waiting [default: sleep]
---wait-selector       -i      TEXT                                                                     Selector or text to use for page content load waiting. [default: None]
---headless            -h                                                                               Run in headless mode (for Selenium)
---sleep-time          -t      INTEGER                                                                  Time to sleep before scrolling (in seconds) [default: 3]
---ai-provider         -a      [Ollama|LlamaCpp|OpenRouter|OpenAI|Gemini|Github|XAI|Anthropic|          AI provider to use for processing [default: OpenAI]       
-                               Groq|Mistral|Deepseek|LiteLLM|Bedrock]│
---model               -m      TEXT                                                                     AI model to use for processing. If not specified, a default model will be used.[default: None]                                                         │
---ai-base-url         -b      TEXT                                                                     Override the base URL for the AI provider. [default: None]
---prompt-cache                                                                                         Enable prompt cache for Anthropic provider
---display-output      -d      [none|plain|md|csv|json]                                                 Display output in terminal (md, csv, or json) [default: None]
---output-folder       -o      PATH                                                                     Specify the location of the output folder [default: output]
---silent              -q                                                                               Run in silent mode, suppressing output
---run-name            -n      TEXT                                                                     Specify a name for this run
---pricing             -p      [none|price|details]                                                     Enable pricing summary display [default: details]
---cleanup             -c      [none|before|after|both]                                                 How to handle cleanup of output folder. [default: none]
---extraction-prompt   -e      PATH                                                                     Path to the extraction prompt file [default: None]
---crawl-type          -C      [single_page|single_level|domain|paginated]                              Enable crawling mode [default: single_page]
---version             -v                                                                               Show the version and exit.
---help                                                                                                 Show this message and exit.
+--url                  -u      TEXT                                                             URL to scrape [default: https://openai.com/api/pricing/]
+--output-format        -O      [md|json|csv|excel]                                              Output format for the scraped data [default: md]
+--fields               -f      TEXT                                                             Fields to extract from the webpage
+                                                                                                [default: Model, Pricing Input, Pricing Output, Cache Price]
+--scraper              -s      [selenium|playwright]                                            Scraper to use: 'selenium' or 'playwright' [default: playwright]
+--retries              -r      INTEGER                                                          Retry attempts for failed scrapes [default: 3]
+--scrape-max-parallel  -P      INTEGER                                                          Max parallel fetch requests [default: 1]
+--wait-type            -w      [none|pause|sleep|idle|selector|text]                            Method to use for page content load waiting [default: sleep]
+--wait-selector        -i      TEXT                                                             Selector or text to use for page content load waiting. [default: None]
+--headless             -h                                                                       Run in headless mode (for Selenium)
+--sleep-time           -t      INTEGER                                                          Time to sleep before scrolling (in seconds) [default: 2]
+--ai-provider          -a      [Ollama|LlamaCpp|OpenRouter|OpenAI|Gemini|Github|XAI|Anthropic|  AI provider to use for processing [default: OpenAI]
+                               Groq|Mistral|Deepseek|LiteLLM|Bedrock]
+--model                -m      TEXT                                                             AI model to use for processing. If not specified, a default
+                                                                                                model will be used. [default: None]
+--ai-base-url          -b      TEXT                                                             Override the base URL for the AI provider. [default: None]
+--prompt-cache                                                                                  Enable prompt cache for Anthropic provider
+--display-output       -d      [none|plain|md|csv|json]                                         Display output in terminal (md, csv, or json) [default: None]
+--output-folder        -o      PATH                                                             Specify the location of the output folder [default: output]
+--silent               -q                                                                       Run in silent mode, suppressing output
+--run-name             -n      TEXT                                                             Specify a name for this run. Can be used to resume a crawl. Defaults to YYYYmmdd_HHMMSS
+--pricing              -p      [none|price|details]                                             Enable pricing summary display [default: details]
+--cleanup              -c      [none|before|after|both]                                         How to handle cleanup of output folder. [default: none]
+--extraction-prompt    -e      PATH                                                             Path to the extraction prompt file [default: None]
+--crawl-type           -C      [single_page|single_level|domain|paginated]                      Enable crawling mode [default: single_page]
+--crawl-max-pages      -M      INTEGER                                                          Maximum number of pages to crawl this session [default: 100]
+--crawl-batch-size     -b      INTEGER                                                          Maximum number of pages to load from the queue at once [default: 1]
+--version              -v
+--help                                                                                          Show this message and exit.
 ```
 
 ### Examples
 
-1. Basic usage with default options:
+* Basic usage with default options:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Model" -f "Pricing Input" -f "Pricing Output" --pricing details --display-output csv
+par_scrape --url "https://openai.com/api/pricing/" -f "Model" -f "Pricing Input" -f "Pricing Output" -O json -O csv --pricing details --display-output csv
 ```
-2. Using Playwright, displaying JSON output and waiting for text gpt-4o to be in page before continuing:
+* Using Playwright, displaying JSON output and waiting for text gpt-4o to be in page before continuing:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --scraper playwright -d json --pricing details -w text -i gpt-4o
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --scraper playwright -O json -O csv -d json --pricing details -w text -i gpt-4o
 ```
-3. Specifying a custom model and output folder:
+* Specifying a custom model and output folder:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --model gpt-4 --output-folder ./custom_output --pricing details -w text -i gpt-4o
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --model gpt-4 --output-folder ./custom_output -O json -O csv --pricing details -w text -i gpt-4o
 ```
-4. Running in silent mode with a custom run name:
+* Running in silent mode with a custom run name:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --silent --run-name my_custom_run --pricing details -w text -i gpt-4o
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --silent --run-name my_custom_run --pricing details -O json -O csv -w text -i gpt-4o
 ```
-5. Using the cleanup option to remove the output folder after scraping:
+* Using the cleanup option to remove the output folder after scraping:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --cleanup --pricing details
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --cleanup --pricing details -O json -O csv 
 ```
-6. Using the pause option to wait for user input before scrolling:
+* Using the pause option to wait for user input before scrolling:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --pause --pricing details
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --pause --pricing details -O json -O csv 
 ```
-7. Using Anthropic provider with prompt cache enabled and detailed pricing breakdown:
+* Using Anthropic provider with prompt cache enabled and detailed pricing breakdown:
 ```bash
-par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Description" -f "Price" -f "Cache Price"
+par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Description" -f "Price" -f "Cache Price" -O json -O csv 
 ```
 
+* Crawling single level and only outputting markdown (No LLM or cost):
+```bash
+par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --scrape-max-parallel 5 --crawl-type single_level
+```
+
+
 ## Roadmap
-- Site crawling
+- API Server
+- Paginated Listing crawling
+
 
 ## Whats New
 - Version 0.6.0
   - Fixed bug where images were being striped from markdown output
   - Now uses par_ai_core for url fetching and markdown conversion
-  - Updated system prompt for better results
-  - Now supports site crawling
+  - New Features:
+    - BREAKING CHANGES: 
+      - New option to specify desired output formats `-O` which defaults to markdown only which does not require AI
+    - BEHAVIOR CHANGES:
+      - Now retries 3 times on failed scrapes
+    - Basic site crawling
+    - Retry failed fetches
+    - HTTP authentication
+    - Proxy settings
+  - Updated system prompt for better results 
 - Version 0.5.1
   - Update ai-core and dependencies
   - Now supports Deepseek, XAI and LiteLLM
