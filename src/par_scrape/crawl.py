@@ -23,7 +23,7 @@ class CrawlType(str, Enum):
     SINGLE_PAGE = "single_page"
     SINGLE_LEVEL = "single_level"
     DOMAIN = "domain"
-    PAGINATED = "paginated"
+    # PAGINATED = "paginated"
 
 
 class PageStatus(str, Enum):
@@ -59,9 +59,9 @@ def extract_links(base_url: str, html: str, crawl_type: CrawlType) -> list[str]:
         elif crawl_type == CrawlType.DOMAIN:
             if parsed.netloc == urlparse(base_url).netloc:
                 links.append(normalize_url(full_url))
-        elif crawl_type == CrawlType.PAGINATED:
-            if "next" in link.get("rel", []) or "page" in link.text.lower():  # type: ignore
-                links.append(normalize_url(full_url))
+        # elif crawl_type == CrawlType.PAGINATED:
+        #     if "next" in link.get("rel", []) or "page" in link.text.lower():  # type: ignore
+        #         links.append(normalize_url(full_url))
 
     return list(set(links))
 
