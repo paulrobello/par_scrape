@@ -19,6 +19,7 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 
 - Web scraping using Playwright or Selenium 
 - AI-powered data extraction and formatting
+- Can be used to crawl and extract clean markdown without AI
 - Supports multiple output formats (JSON, Excel, CSV, Markdown)
 - Customizable field extraction
 - Token usage and cost estimation
@@ -244,7 +245,8 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
 
 ## Roadmap
 - API Server
-- Paginated Listing crawling
+- More crawling options
+  - Paginated Listing crawling
 
 
 ## Whats New
@@ -253,7 +255,7 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
   - Now uses par_ai_core for url fetching and markdown conversion
   - New Features:
     - BREAKING CHANGES: 
-      - New option to specify desired output formats `-O` which defaults to markdown only which does not require AI
+      - New option to specify desired output formats `-O` which defaults to markdown only, which does not require AI
     - BEHAVIOR CHANGES:
       - Now retries 3 times on failed scrapes
     - Basic site crawling
