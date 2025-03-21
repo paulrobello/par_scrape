@@ -26,8 +26,10 @@ def save_raw_data(raw_data: str, output_base: Path) -> Path:
         Path: The path to the saved file.
     """
     if output_base.is_dir():
+        # Use a simple filename without ticket_id since the path already has it
         raw_output_path = output_base / "raw_data.md"
     else:
+        # For non-directory paths, just append -raw
         raw_output_path = Path(str(output_base) + "-raw.md")
     raw_output_path.write_text(raw_data)
     console_out.print(Panel(f"Raw data saved to [bold green]{raw_output_path}[/bold green]"))
@@ -133,11 +135,14 @@ def save_formatted_data(
     """
     Save Extracted data to JSON, Excel, CSV, and Markdown files.
 
+    Note: run_name should only be used for logging/reference, not for directory creation
+    since directories should already include run_name once via get_url_output_folder.
+
     Args:
         formatted_data (BaseModel): The Extracted data to save.
         output_formats (List[OutputFormat]): The desired output format.
-        run_name (str): The run name to use in the filenames.
-        output_folder (str, optional): The folder to save the files in. Defaults to 'output'.
+        run_name (str): The run name used for logging purposes only.
+        output_folder (Path): The folder to save the files in.
 
     Returns:
         Tuple[pd.DataFrame | None, Dict[OutputFormat, Path]]: The DataFrame created from the Extracted data and a dictionary of
@@ -151,8 +156,9 @@ def save_formatted_data(
     formatted_data_dict = formatted_data.model_dump()
 
     if OutputFormat.JSON in output_formats:
-        # Save the Extracted data as JSON with run_name in filename
-        json_output_path = output_folder / f"extracted_data_{run_name}.json"
+        # Save the Extracted data as JSON without adding run_name to the filename
+        # as the run_name is already part of the folder structure
+        json_output_path = output_folder / "extracted_data.json"
         json_output_path.write_text(json.dumps(formatted_data_dict, indent=4), encoding="utf-8")
 
         console_out.print(Panel(f"Extracted data saved to JSON at [bold green]{json_output_path}[/bold green]"))
@@ -176,7 +182,8 @@ def save_formatted_data(
 
         if OutputFormat.EXCEL in output_formats:
             try:
-                excel_output_path = output_folder / f"extracted_data_{run_name}.xlsx"
+                # Don't include run_name in filename since it's already in the path
+                excel_output_path = output_folder / "extracted_data.xlsx"
                 df.to_excel(excel_output_path, index=False)
                 console_out.print(Panel(f"Excel data saved to [bold green]{excel_output_path}[/bold green]"))
                 file_paths[OutputFormat.EXCEL] = excel_output_path
@@ -186,7 +193,8 @@ def save_formatted_data(
 
         if OutputFormat.CSV in output_formats:
             try:
-                csv_output_path = output_folder / f"extracted_data_{run_name}.csv"
+                # Don't include run_name in filename since it's already in the path
+                csv_output_path = output_folder / "extracted_data.csv"
                 df.to_csv(csv_output_path, index=False)
                 console_out.print(Panel(f"CSV data saved to [bold green]{csv_output_path}[/bold green]"))
                 file_paths[OutputFormat.CSV] = csv_output_path
@@ -196,7 +204,8 @@ def save_formatted_data(
 
         if OutputFormat.MARKDOWN in output_formats:
             try:
-                markdown_output_path = output_folder / f"extracted_data_{run_name}.md"
+                # Don't include run_name in filename since it's already in the path
+                markdown_output_path = output_folder / "extracted_data.md"
                 markdown_output_path.write_text(df.to_markdown(index=False) or "", encoding="utf-8")
                 console_out.print(Panel(f"Markdown table saved to [bold green]{markdown_output_path}[/bold green]"))
                 file_paths[OutputFormat.MARKDOWN] = markdown_output_path

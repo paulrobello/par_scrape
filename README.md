@@ -175,35 +175,39 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 
 ### Options
 ```
---url                  -u      TEXT                                                             URL to scrape [default: https://openai.com/api/pricing/]
---output-format        -O      [md|json|csv|excel]                                              Output format for the scraped data [default: md]
---fields               -f      TEXT                                                             Fields to extract from the webpage
-                                                                                                [default: Model, Pricing Input, Pricing Output, Cache Price]
---scraper              -s      [selenium|playwright]                                            Scraper to use: 'selenium' or 'playwright' [default: playwright]
---retries              -r      INTEGER                                                          Retry attempts for failed scrapes [default: 3]
---scrape-max-parallel  -P      INTEGER                                                          Max parallel fetch requests [default: 1]
---wait-type            -w      [none|pause|sleep|idle|selector|text]                            Method to use for page content load waiting [default: sleep]
---wait-selector        -i      TEXT                                                             Selector or text to use for page content load waiting. [default: None]
---headless             -h                                                                       Run in headless mode (for Selenium)
---sleep-time           -t      INTEGER                                                          Time to sleep before scrolling (in seconds) [default: 2]
---ai-provider          -a      [Ollama|LlamaCpp|OpenRouter|OpenAI|Gemini|Github|XAI|Anthropic|  AI provider to use for processing [default: OpenAI]
-                               Groq|Mistral|Deepseek|LiteLLM|Bedrock]
---model                -m      TEXT                                                             AI model to use for processing. If not specified, a default
-                                                                                                model will be used. [default: None]
---ai-base-url          -b      TEXT                                                             Override the base URL for the AI provider. [default: None]
---prompt-cache                                                                                  Enable prompt cache for Anthropic provider
---display-output       -d      [none|plain|md|csv|json]                                         Display output in terminal (md, csv, or json) [default: None]
---output-folder        -o      PATH                                                             Specify the location of the output folder [default: output]
---silent               -q                                                                       Run in silent mode, suppressing output
---run-name             -n      TEXT                                                             Specify a name for this run. Can be used to resume a crawl. Defaults to YYYYmmdd_HHMMSS
---pricing              -p      [none|price|details]                                             Enable pricing summary display [default: details]
---cleanup              -c      [none|before|after|both]                                         How to handle cleanup of output folder. [default: none]
---extraction-prompt    -e      PATH                                                             Path to the extraction prompt file [default: None]
---crawl-type           -C      [single_page|single_level|domain|paginated]                      Enable crawling mode [default: single_page]
---crawl-max-pages      -M      INTEGER                                                          Maximum number of pages to crawl this session [default: 100]
---crawl-batch-size     -b      INTEGER                                                          Maximum number of pages to load from the queue at once [default: 1]
+--url                  -u      TEXT                                                                                           URL to scrape [default: https://openai.com/api/pricing/]
+--output-format        -O      [md|json|csv|excel]                                                                            Output format for the scraped data [default: md]
+--fields               -f      TEXT                                                                                           Fields to extract from the webpage
+                                                                                                                              [default: Model, Pricing Input, Pricing Output, Cache Price] 
+--scraper              -s      [selenium|playwright]                                                                          Scraper to use: 'selenium' or 'playwright' [default: playwright]
+--retries              -r      INTEGER                                                                                        Retry attempts for failed scrapes [default: 3]
+--scrape-max-parallel  -P      INTEGER                                                                                        Max parallel fetch requests [default: 1]
+--wait-type            -w      [none|pause|sleep|idle|selector|text]                                                          Method to use for page content load waiting [default: sleep]
+--wait-selector        -i      TEXT                                                                                           Selector or text to use for page content load waiting. [default: None]
+--headless             -h                                                                                                     Run in headless mode (for Selenium)
+--sleep-time           -t      INTEGER                                                                                        Time to sleep before scrolling (in seconds) [default: 2]
+--ai-provider          -a      [Ollama|LlamaCpp|OpenRouter|OpenAI|Gemini|Github|XAI|Anthropic|
+                                Groq|Mistral|Deepseek|LiteLLM|Bedrock]                                                        AI provider to use for processing [default: OpenAI]
+--model                -m      TEXT                                                                                           AI model to use for processing. If not specified, a default model will be used. [default: None]
+--ai-base-url          -b      TEXT                                                                                           Override the base URL for the AI provider. [default: None]
+--prompt-cache                                                                                                                Enable prompt cache for Anthropic provider
+--reasoning-effort             [low|medium|high]                                                                              Reasoning effort level to use for o1 and o3 models. [default: None]
+--reasoning-budget             INTEGER                                                                                        Maximum context size for reasoning. [default: None]
+--display-output       -d      [none|plain|md|csv|json]                                                                       Display output in terminal (md, csv, or json) [default: None]
+--output-folder        -o      PATH                                                                                           Specify the location of the output folder [default: output]
+--silent               -q                                                                                                     Run in silent mode, suppressing output
+--run-name             -n      TEXT                                                                                           Specify a name for this run. Can be used to resume a crawl Defaults to YYYYmmdd_HHMMSS
+--pricing              -p      [none|price|details]                                                                           Enable pricing summary display [default: details]
+--cleanup              -c      [none|before|after|both]                                                                       How to handle cleanup of output folder [default: none]
+--extraction-prompt    -e      PATH                                                                                           Path to the extraction prompt file [default: None]
+--crawl-type           -C      [single_page|single_level|domain]                                                              Enable crawling mode [default: single_page]
+--crawl-max-pages      -M      INTEGER                                                                                        Maximum number of pages to crawl this session [default: 100]
+--crawl-batch-size     -B      INTEGER                                                                                        Maximum number of pages to load from the queue at once [default: 1]
+--respect-rate-limits                                                                                                         Whether to use domain-specific rate limiting [default: True]
+--respect-robots                                                                                                              Whether to respect robots.txt
+--crawl-delay                  INTEGER                                                                                        Default delay in seconds between requests to the same domain [default: 1]
 --version              -v
---help                                                                                          Show this message and exit.
+--help                                                                                                                        Show this message and exit.
 ```
 
 ### Examples
@@ -250,6 +254,14 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
 
 
 ## Whats New
+- Version 0.7.0
+  - Major overhaul and fixing of crawling features.
+  - added --respect-robots flag to check robots.txt before scraping
+  - added --respect-rate-limits to respect rate limits for domains
+  - added --reasoning-effort  and --reasoning-budget for o1/o3 and Sonnet 3.7
+  - updated dependencies
+- Version 0.6.1
+  - Updated ai-core
 - Version 0.6.0
   - Fixed bug where images were being striped from markdown output
   - Now uses par_ai_core for url fetching and markdown conversion

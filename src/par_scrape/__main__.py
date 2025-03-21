@@ -2,16 +2,18 @@
 
 import os
 import shutil
+import sqlite3
 import time
 from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlparse
 from uuid import uuid4
 
 import typer
 from dotenv import load_dotenv
-from par_ai_core.llm_config import LlmConfig
+from par_ai_core.llm_config import LlmConfig, ReasoningEffort
 from par_ai_core.llm_providers import (
     LlmProvider,
     provider_default_models,
@@ -27,15 +29,20 @@ from rich.text import Text
 
 from par_scrape import __application_title__, __version__
 from par_scrape.crawl import (
+    DB_PATH,
     CrawlType,
+    ErrorType,
+    PageStatus,
     add_to_queue,
+    clean_url_of_ticket_id,
     extract_links,
     get_next_urls,
-    get_queue_size,
+    get_queue_stats,
     get_url_output_folder,
     init_db,
     mark_complete,
     mark_error,
+    set_crawl_delay,
 )
 from par_scrape.enums import CleanupType, OutputFormat
 from par_scrape.scrape_data import (
@@ -149,6 +156,20 @@ def main(
         bool,
         typer.Option("--prompt-cache", help="Enable prompt cache for Anthropic provider"),
     ] = False,
+    reasoning_effort: Annotated[
+        ReasoningEffort | None,
+        typer.Option(
+            "--reasoning-effort",
+            help="Reasoning effort level to use for o1 and o3 models.",
+        ),
+    ] = None,
+    reasoning_budget: Annotated[
+        int | None,
+        typer.Option(
+            "--reasoning-budget",
+            help="Maximum context size for reasoning.",
+        ),
+    ] = None,
     display_output: Annotated[
         DisplayOutputFormat | None,
         typer.Option(
@@ -179,7 +200,7 @@ def main(
     ] = PricingDisplay.DETAILS,
     cleanup: Annotated[
         CleanupType,
-        typer.Option("--cleanup", "-c", help="How to handle cleanup of output folder."),
+        typer.Option("--cleanup", "-c", help="How to handle cleanup of output folder"),
     ] = CleanupType.NONE,
     extraction_prompt: Annotated[
         Path | None,
@@ -200,7 +221,19 @@ def main(
     ] = 100,
     crawl_batch_size: Annotated[
         int,
-        typer.Option("--crawl-batch-size", "-b", help="Maximum number of pages to load from the queue at once"),
+        typer.Option("--crawl-batch-size", "-B", help="Maximum number of pages to load from the queue at once"),
+    ] = 1,
+    respect_rate_limits: Annotated[
+        bool,
+        typer.Option("--respect-rate-limits", help="Whether to use domain-specific rate limiting"),
+    ] = True,
+    respect_robots: Annotated[
+        bool,
+        typer.Option("--respect-robots", help="Whether to respect robots.txt"),
+    ] = False,
+    crawl_delay: Annotated[
+        int,
+        typer.Option("--crawl-delay", help="Default delay in seconds between requests to the same domain"),
     ] = 1,
     version: Annotated[  # pylint: disable=unused-argument
         bool | None,
@@ -246,7 +279,14 @@ def main(
             raise typer.Exit(1)
 
         console_out.print("[bold cyan]Creating llm config and dynamic models...")
-        llm_config = LlmConfig(provider=ai_provider, model_name=model, temperature=0, base_url=ai_base_url)
+        llm_config = LlmConfig(
+            provider=ai_provider,
+            model_name=model,
+            temperature=0,
+            base_url=ai_base_url,
+            reasoning_effort=reasoning_effort,
+            reasoning_budget=reasoning_budget,
+        )
         dynamic_extraction_model = create_dynamic_model(fields)
         dynamic_model_container = create_container_model(dynamic_extraction_model)
 
@@ -313,6 +353,12 @@ def main(
                 ("Crawl Batch Size: ", "cyan"),
                 (f"{crawl_batch_size}", "green"),
                 "\n",
+                ("Respect Rate Limits: ", "cyan"),
+                (f"{respect_rate_limits}", "green"),
+                "\n",
+                ("Default Crawl Delay: ", "cyan"),
+                (f"{crawl_delay} seconds", "green"),
+                "\n",
                 ("Output Format: ", "cyan"),
                 (", ".join([f"{format.value}" for format in output_format]), "green"),
                 "\n",
@@ -364,12 +410,40 @@ def main(
                 with console_out.status("[bold green]Starting fetch loop...") as status:
                     start_time = time.time()
                     num_pages: int = 0
+                    base_output_folder = Path("./output")
+                    # Set initial crawl delay for all domains
+                    if respect_rate_limits and crawl_delay > 1:
+                        with sqlite3.connect(DB_PATH) as conn:
+                            conn.execute("UPDATE domain_rate_limit SET crawl_delay = ?", (crawl_delay,))
+
                     while num_pages < crawl_max_pages:
-                        urls = get_next_urls(run_name, crawl_batch_size, scrape_retries)
-                        status.update(f"[bold cyan]URLs remaining: [yellow]{get_queue_size(run_name)}")
+                        # Get queue statistics
+                        queue_stats = get_queue_stats(run_name)
+                        queued = queue_stats.get(PageStatus.QUEUED.value, 0)
+                        completed = queue_stats.get(PageStatus.COMPLETED.value, 0)
+                        errors = queue_stats.get(PageStatus.ERROR.value, 0)
+                        active = queue_stats.get(PageStatus.ACTIVE.value, 0)
+
+                        status.update(
+                            f"[bold cyan]Queue status: "
+                            f"[yellow]{queued}[/yellow] queued, "
+                            f"[green]{completed}[/green] completed, "
+                            f"[red]{errors}[/red] errors, "
+                            f"[blue]{active}[/blue] active"
+                        )
+
+                        urls = get_next_urls(
+                            run_name, crawl_batch_size, scrape_retries, respect_rate_limits=respect_rate_limits
+                        )
 
                         if not urls:
-                            break
+                            # Check if there are any active URLs that might complete
+                            if active > 0:
+                                console_out.print(f"[yellow]Waiting for {active} active URLs to complete...[/yellow]")
+                                time.sleep(2)  # Give a small delay to avoid tight loop
+                                continue
+                            else:
+                                break
                         num_pages += len(urls)
 
                         try:
@@ -394,12 +468,20 @@ def main(
                                 try:
                                     console_out.print(f"[green]{current_url}")
 
-                                    output_folder = get_url_output_folder(output_folder, run_name, current_url)
+                                    # Use an even more aggressive approach to avoid nesting
+                                    # 1. Completely clean the URL of any run_name occurrences
+                                    cleaned_url = clean_url_of_ticket_id(current_url, run_name)
+
+                                    url_output_folder = get_url_output_folder(base_output_folder, run_name, cleaned_url)
+
+                                    # 2. Print for debugging
+                                    console_out.print(f"[blue]Output folder: {url_output_folder}[/blue]")
+                                    # Create necessary directories
                                     if llm_needed:
-                                        output_folder.mkdir(parents=True, exist_ok=True)
+                                        url_output_folder.mkdir(parents=True, exist_ok=True)
                                     else:
-                                        output_folder.parent.mkdir(parents=True, exist_ok=True)
-                                    # console_out.print(f"[green]{output_folder}")
+                                        url_output_folder.parent.mkdir(parents=True, exist_ok=True)
+                                    # console_out.print(f"[green]{url_output_folder}")
 
                                     if not raw_html:
                                         raise ValueError("No data was fetched")
@@ -409,8 +491,30 @@ def main(
                                     if (
                                         crawl_type == CrawlType.SINGLE_LEVEL and current_url == url
                                     ) or crawl_type == CrawlType.DOMAIN:
-                                        page_links = extract_links(current_url, raw_html, crawl_type)
-                                        add_to_queue(run_name, page_links)
+                                        # Extract links, respecting robots.txt
+                                        page_links = extract_links(
+                                            current_url,
+                                            raw_html,
+                                            crawl_type,
+                                            respect_robots=respect_robots,
+                                            console=console_out,
+                                            ticket_id=run_name,
+                                        )
+
+                                        # Calculate the current page depth
+                                        current_depth = 0
+                                        with sqlite3.connect(DB_PATH) as conn:
+                                            row = conn.execute(
+                                                "SELECT depth FROM scrape WHERE ticket_id = ? AND url = ?",
+                                                (run_name, current_url),
+                                            ).fetchone()
+                                            if row:
+                                                current_depth = row[0]
+
+                                        # Add extracted links to queue with incremented depth
+                                        if page_links:
+                                            console_out.print(f"[cyan]Found {len(page_links)} links on {current_url}")
+                                            add_to_queue(run_name, page_links, current_depth + 1)
                                     # break
                                     status.update("[bold cyan]Converting HTML to Markdown...")
                                     markdown = html_to_markdown(raw_html, url=current_url, include_images=True)
@@ -419,7 +523,7 @@ def main(
 
                                     # Save raw data
                                     status.update("[bold cyan]Saving raw data...")
-                                    raw_output_path = save_raw_data(markdown, output_folder)
+                                    raw_output_path = save_raw_data(markdown, url_output_folder)
 
                                     if "Application error" in markdown:
                                         raise ValueError("Application error encountered.")
@@ -442,7 +546,7 @@ def main(
                                         _, file_paths = save_formatted_data(
                                             formatted_data=formatted_data,
                                             run_name=run_name,
-                                            output_folder=output_folder,
+                                            output_folder=url_output_folder,
                                             output_formats=output_format,
                                         )
                                     else:
@@ -474,18 +578,66 @@ def main(
 
                                     console_out.print(
                                         Panel.fit(
-                                            "\n".join([str(p) for p in file_paths.values()] + [str(raw_output_path)]),
+                                            "\n".join(
+                                                set([str(p) for p in file_paths.values()] + [str(raw_output_path)])
+                                            ),
                                             title="Files",
                                         )
                                     )
                                 except Exception as e:
-                                    mark_error(run_name, current_url, str(e))
+                                    # Classify error type
+                                    error_type = ErrorType.OTHER
+                                    error_msg = str(e)
+
+                                    if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+                                        error_type = ErrorType.TIMEOUT
+                                    elif "network" in error_msg.lower() or "connection" in error_msg.lower():
+                                        error_type = ErrorType.NETWORK
+                                    elif "robots.txt" in error_msg.lower() or "disallowed" in error_msg.lower():
+                                        error_type = ErrorType.ROBOTS_DISALLOWED
+                                    elif "html" in error_msg.lower() or "parse" in error_msg.lower():
+                                        error_type = ErrorType.PARSING
+                                    elif "url" in error_msg.lower() or "scheme" in error_msg.lower():
+                                        error_type = ErrorType.INVALID_URL
+
+                                    mark_error(run_name, current_url, error_msg, error_type)
                                     console_out.print(
-                                        f"[bold red]URL processing error:[/bold red][blue]{current_url}[/blue] {str(e)}"
+                                        f"[bold red]URL processing error ([yellow]{error_type.value}[/yellow]):[/bold red][blue]{current_url}[/blue] {error_msg}"
                                     )
+
+                                    # Adjust rate limits on network errors
+                                    if error_type == ErrorType.NETWORK or error_type == ErrorType.TIMEOUT:
+                                        domain = urlparse(current_url).netloc
+                                        current_delay = 1
+                                        with sqlite3.connect(DB_PATH) as conn:
+                                            row = conn.execute(
+                                                "SELECT crawl_delay FROM domain_rate_limit WHERE domain = ?", (domain,)
+                                            ).fetchone()
+                                            if row:
+                                                current_delay = row[0]
+
+                                        # Increase delay for this domain (max 30 seconds)
+                                        new_delay = min(current_delay * 2, 30)
+                                        set_crawl_delay(domain, new_delay)
+                                        console_out.print(
+                                            f"[yellow]Increased rate limit for {domain} to {new_delay} seconds[/yellow]"
+                                        )
                         except Exception as e:
-                            mark_error(run_name, current_url, str(e))
-                            console_out.print(f"[bold red]A fetch error occurred:[/bold red] {str(e)}")
+                            # Determine error type
+                            error_type = ErrorType.OTHER
+                            error_msg = str(e)
+
+                            if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+                                error_type = ErrorType.TIMEOUT
+                            elif "network" in error_msg.lower() or "connection" in error_msg.lower():
+                                error_type = ErrorType.NETWORK
+
+                            for current_url in urls:
+                                mark_error(run_name, current_url, error_msg, error_type)
+
+                            console_out.print(
+                                f"[bold red]A fetch error occurred ([yellow]{error_type.value}[/yellow]):[/bold red] {error_msg}"
+                            )
                     # end while num_pages < crawl_max_pages
                     duration = time.time() - start_time
                     console_out.print(

@@ -5,9 +5,7 @@ run    := uv run
 python := $(run) python
 ruff  := $(run) ruff
 pyright := $(run) pyright
-twine  := $(run) twine
-#build  := $(python) -m build
-build := uvx --from build pyproject-build --installer uv
+build  := uv build
 
 #export UV_LINK_MODE=copy
 export PIPENV_VERBOSITY=-1
@@ -84,26 +82,20 @@ pre-commit-update:
 ##############################################################################
 # Package/publish.
 .PHONY: package
-package:			# Package the library
-	$(build) -w
+package: clean			# Package the library
+	$(build)
 
 .PHONY: spackage
 spackage:			# Create a source package for the library
-	$(build) -s
+	$(build) --sdist
 
-.PHONY: packagecheck
-packagecheck: clean package spackage		# Check the packaging.
-	$(twine) check dist/*
+.PHONY: test-publish
+test-publish: package		# Upload to testpypi
+	$(publish) upload --index testpypi --check-url
 
-.PHONY: testdist
-testdist: packagecheck		# Perform a test distribution
-	$(twine) upload --repository testpypi dist/*
-	#$(twine) upload --skip-existing --repository testpypi dist/*
-
-.PHONY: dist
-dist: packagecheck		# Upload to pypi
-	$(twine) upload --skip-existing dist/*
-
+.PHONY: publish
+publish: package		# Upload to pypi
+	$(publish) upload --check-url
 ##############################################################################
 # Utility.
 
