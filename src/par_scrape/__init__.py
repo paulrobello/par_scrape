@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 
 __author__ = "Paul Robello"
-__copyright__ = "Copyright 2024, Paul Robello"
+__copyright__ = "Copyright 2025, Paul Robello"
 __credits__ = ["Paul Robello"]
 __maintainer__ = "Paul Robello"
 __email__ = "probello@gmail.com"
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 __licence__ = "MIT"
 __application_title__ = "PAR Scrape"
 __application_binary__ = "par_scrape"
