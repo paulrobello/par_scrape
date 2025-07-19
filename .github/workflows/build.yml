@@ -11,6 +11,7 @@ jobs:
   build:
     name: Build distribution 📦
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +50,7 @@ jobs:
 
   tag-version:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write  # Grant write access to the repository
     needs:
@@ -90,8 +92,8 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config --global user.name "${{ github.actor }}"
-          git config --global user.email "${{ github.event.pusher.email }}"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: App VERSION
         run: echo "VERSION is ${{ env.VERSION }}"
@@ -131,3 +133,9 @@ jobs:
             echo "Failed to push tag"
             exit 1
           fi
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          git tag -d "v${{ env.VERSION }}" || true
+          git push --delete origin "v${{ env.VERSION }}" || true
