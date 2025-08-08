@@ -6,6 +6,7 @@ python := $(run) python
 ruff  := $(run) ruff
 pyright := $(run) pyright
 build  := uv build
+publish := uv publish
 
 #export UV_LINK_MODE=copy
 export PIPENV_VERBOSITY=-1

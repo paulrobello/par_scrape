@@ -17,7 +17,7 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 
 ## Features
 
-- Web scraping using Playwright or Selenium 
+- Web scraping using Playwright or Selenium
 - AI-powered data extraction and formatting
 - Can be used to crawl and extract clean markdown without AI
 - Supports multiple output formats (JSON, Excel, CSV, Markdown)
@@ -60,7 +60,7 @@ The options `--crawl-max-pages` / `-M` can be used to limit the total number of 
 
 ## Prerequisites
 
-To install PAR Scrape, make sure you have Python 3.11.
+To install PAR Scrape, make sure you have Python 3.11 or higher (supports Python 3.11-3.13).
 
 ### [uv](https://pypi.org/project/uv/) is recommended
 
@@ -178,7 +178,7 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 --url                  -u      TEXT                                                                                           URL to scrape [default: https://openai.com/api/pricing/]
 --output-format        -O      [md|json|csv|excel]                                                                            Output format for the scraped data [default: md]
 --fields               -f      TEXT                                                                                           Fields to extract from the webpage
-                                                                                                                              [default: Model, Pricing Input, Pricing Output, Cache Price] 
+                                                                                                                              [default: Model, Pricing Input, Pricing Output, Cache Price]
 --scraper              -s      [selenium|playwright]                                                                          Scraper to use: 'selenium' or 'playwright' [default: playwright]
 --retries              -r      INTEGER                                                                                        Retry attempts for failed scrapes [default: 3]
 --scrape-max-parallel  -P      INTEGER                                                                                        Max parallel fetch requests [default: 1]
@@ -230,15 +230,15 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 ```
 * Using the cleanup option to remove the output folder after scraping:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --cleanup --pricing details -O json -O csv 
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --cleanup --pricing details -O json -O csv
 ```
 * Using the pause option to wait for user input before scrolling:
 ```bash
-par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --pause --pricing details -O json -O csv 
+par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -f "Price" --pause --pricing details -O json -O csv
 ```
 * Using Anthropic provider with prompt cache enabled and detailed pricing breakdown:
 ```bash
-par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Description" -f "Price" -f "Cache Price" -O json -O csv 
+par_scrape -a Anthropic --prompt-cache -d csv -p details -f "Title" -f "Description" -f "Price" -f "Cache Price" -O json -O csv
 ```
 
 * Crawling single level and only outputting markdown (No LLM or cost):
@@ -268,7 +268,7 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
   - Fixed bug where images were being striped from markdown output
   - Now uses par_ai_core for url fetching and markdown conversion
   - New Features:
-    - BREAKING CHANGES: 
+    - BREAKING CHANGES:
       - New option to specify desired output formats `-O` which defaults to markdown only, which does not require AI
     - BEHAVIOR CHANGES:
       - Now retries 3 times on failed scrapes
@@ -276,7 +276,7 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
     - Retry failed fetches
     - HTTP authentication
     - Proxy settings
-  - Updated system prompt for better results 
+  - Updated system prompt for better results
 - Version 0.5.1
   - Update ai-core and dependencies
   - Now supports Deepseek, XAI and LiteLLM
