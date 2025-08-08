@@ -254,6 +254,8 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
 
 
 ## Whats New
+- Version 0.8.0
+  - Update deps and ci/cd workflows
 - Version 0.7.1
   - Updated par-ai-core and other deps
 - Version 0.7.0
