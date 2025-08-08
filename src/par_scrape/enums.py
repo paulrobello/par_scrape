@@ -1,4 +1,4 @@
-"""Enum for scraper choices."""
+"""Enums for scraper choices."""
 
 from strenum import StrEnum
 
