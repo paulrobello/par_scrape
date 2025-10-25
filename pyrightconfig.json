@@ -17,6 +17,6 @@
   "venv": ".venv",
   "reportMissingImports": true,
   "reportMissingTypeStubs": false,
-  "pythonVersion": "3.10",
+  "pythonVersion": "3.13",
   "typeCheckingMode": "basic"
 }
