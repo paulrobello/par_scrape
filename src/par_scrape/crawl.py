@@ -126,6 +126,17 @@ class ErrorType(str, Enum):
     TIMEOUT = "timeout"
     OTHER = "other"
 
+class InvalidURLError(Exception):
+    """Raised when a URL is invalid."""
+    pass
+
+class ScrapeError(Exception):
+    """Raised when a scraping operation fails."""
+    pass
+
+class RobotError(Exception):
+    """Raised when there is a failure parsing or reading robots.txt."""
+    pass
 
 def is_valid_url(url: str) -> bool:
     """
@@ -140,7 +151,7 @@ def is_valid_url(url: str) -> bool:
     try:
         parsed = urlparse(url)
         return all([parsed.scheme in ("http", "https"), parsed.netloc])
-    except Exception:
+    except Exception as e:
         return False
 
 
@@ -201,6 +212,9 @@ def check_robots_txt(url: str, user_agent: str = DEFAULT_USER_AGENT) -> bool:
 
     Returns:
         bool: True if the URL is allowed, False if disallowed
+
+    Raises:
+        RobotError: If there is a failure parsing or reading robots.txt
     """
     try:
         parsed_url = urlparse(url)
@@ -216,7 +230,7 @@ def check_robots_txt(url: str, user_agent: str = DEFAULT_USER_AGENT) -> bool:
                 ROBOTS_PARSERS[domain] = rp
             except Exception:
                 # If we can't read robots.txt, assume everything is allowed
-                return True
+                raise RobotError(f"Failed to read robots.txt from {robots_url}")
 
         # Check if URL is allowed
         return ROBOTS_PARSERS[domain].can_fetch(user_agent, url)
@@ -296,7 +310,11 @@ def extract_links(
                 full_url = urljoin(base_url, href)
 
                 # Validate the URL
-                if not is_valid_url(full_url):
+                try:
+                    if not is_valid_url(full_url):
+                        raise InvalidURLError(f"Invalid URL: {full_url}")
+                except InvalidURLError as e:
+                    print(f"[Error] {e}")
                     continue
 
                 parsed = urlparse(full_url)
@@ -320,10 +338,16 @@ def extract_links(
                         continue
 
                     # Check robots.txt
-                    if respect_robots and not check_robots_txt(normalized_url):
-                        if console:
-                            console.print(f"[yellow]Skipping disallowed URL: {normalized_url}[/yellow]")
-                        continue
+                    if respect_robots: 
+                        try: 
+                            if not check_robots_txt(normalized_url):
+                                if console:
+                                    console.print(f"[yellow]Skipping disallowed URL: {normalized_url}[/yellow]")
+                            continue
+                        except RobotError as e:
+                            if console:
+                                console.print(f"Robots.txt check failed: {str(e)}")
+                            continue
 
                     links.add(normalized_url)
                 # PAGINATED crawl type implementation would go here
@@ -493,30 +517,43 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
         ticket_id: Unique identifier for the crawl job
         urls: Collection of URLs to add to the queue
         depth: Crawl depth of these URLs (default: 0 for starting URLs)
+    
+    Raises:
+        InvalidURLError: If any of the provided URLs are invalid.
+        ScrapeError: If there is an error processing a URL.
     """
+
+
     with sqlite3.connect(DB_PATH) as conn:
         for url in urls:
             # Skip invalid URLs
-            if not is_valid_url(url):
+            try:
+                if not is_valid_url(url):
+                    raise InvalidURLError(f"Invalid URL: {url}")
+            except InvalidURLError as e:
+                print(f"[Error] {e}")
                 continue
 
-            # Clean URL of any ticket_id occurrences to prevent nesting
-            url = clean_url_of_ticket_id(url, ticket_id)
+            try:
+                # Clean URL of any ticket_id occurrences to prevent nesting
+                url = clean_url_of_ticket_id(url, ticket_id)
 
-            # Normalize URL before adding
-            url = normalize_url(url.rstrip("/"))
-            parsed = urlparse(url)
-            domain = parsed.netloc
+                # Normalize URL before adding
+                url = normalize_url(url.rstrip("/"))
+                parsed = urlparse(url)
+                domain = parsed.netloc
 
-            # Insert new URL or ignore if it exists
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO scrape
-                (ticket_id, url, status, domain, depth, queued_at)
-                VALUES (?, ?, ?, ?, ?, strftime('%s','now'))
-                """,
-                (ticket_id, url, PageStatus.QUEUED.value, domain, depth),
-            )
+                # Insert new URL or ignore if it exists
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO scrape
+                    (ticket_id, url, status, domain, depth, queued_at)
+                    VALUES (?, ?, ?, ?, ?, strftime('%s','now'))
+                    """,
+                    (ticket_id, url, PageStatus.QUEUED.value, domain, depth),
+                )
+            except Exception as e:
+                raise ScrapeError(f"Error proccessing URL '{url}': {e}") from e
 
             # Reset error status if re-adding
             conn.execute(
