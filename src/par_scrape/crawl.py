@@ -1,6 +1,7 @@
 """Web crawling functionality for par_scrape."""
 
 import sqlite3
+import threading
 import time
 import urllib.robotparser
 from collections.abc import Iterable
@@ -73,6 +74,8 @@ DB_PATH = BASE_PATH / "jobs.sqlite"
 
 # Global dictionary to store robots.txt parsers by domain
 ROBOTS_PARSERS: dict[str, urllib.robotparser.RobotFileParser] = {}
+# Lock for thread-safe access to ROBOTS_PARSERS
+ROBOTS_PARSERS_LOCK = threading.Lock()
 # Set of excluded URL patterns (common non-content URLs)
 EXCLUDED_URL_PATTERNS = {
     "/login",
@@ -206,20 +209,24 @@ def check_robots_txt(url: str, user_agent: str = DEFAULT_USER_AGENT) -> bool:
         parsed_url = urlparse(url)
         domain = parsed_url.netloc
 
-        # Get or create a robot parser for this domain
-        if domain not in ROBOTS_PARSERS:
-            rp = urllib.robotparser.RobotFileParser()
-            robots_url = f"{parsed_url.scheme}://{domain}/robots.txt"
-            rp.set_url(robots_url)
-            try:
-                rp.read()
-                ROBOTS_PARSERS[domain] = rp
-            except Exception:
-                # If we can't read robots.txt, assume everything is allowed
-                return True
+        # Thread-safe access to ROBOTS_PARSERS
+        with ROBOTS_PARSERS_LOCK:
+            # Get or create a robot parser for this domain
+            if domain not in ROBOTS_PARSERS:
+                rp = urllib.robotparser.RobotFileParser()
+                robots_url = f"{parsed_url.scheme}://{domain}/robots.txt"
+                rp.set_url(robots_url)
+                try:
+                    rp.read()
+                    ROBOTS_PARSERS[domain] = rp
+                except Exception:
+                    # If we can't read robots.txt, assume everything is allowed
+                    # Add a placeholder to avoid re-fetching on every request
+                    ROBOTS_PARSERS[domain] = rp
+                    return True
 
-        # Check if URL is allowed
-        return ROBOTS_PARSERS[domain].can_fetch(user_agent, url)
+            # Check if URL is allowed
+            return ROBOTS_PARSERS[domain].can_fetch(user_agent, url)
     except Exception:
         # On any failure, default to allowing the URL
         return True
@@ -495,47 +502,55 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
         depth: Crawl depth of these URLs (default: 0 for starting URLs)
     """
     with sqlite3.connect(DB_PATH) as conn:
-        for url in urls:
-            # Skip invalid URLs
-            if not is_valid_url(url):
-                continue
+        # Use BEGIN IMMEDIATE for better concurrency control
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            for url in urls:
+                # Skip invalid URLs
+                if not is_valid_url(url):
+                    continue
 
-            # Clean URL of any ticket_id occurrences to prevent nesting
-            url = clean_url_of_ticket_id(url, ticket_id)
+                # Clean URL of any ticket_id occurrences to prevent nesting
+                url = clean_url_of_ticket_id(url, ticket_id)
 
-            # Normalize URL before adding
-            url = normalize_url(url.rstrip("/"))
-            parsed = urlparse(url)
-            domain = parsed.netloc
+                # Normalize URL before adding
+                url = normalize_url(url.rstrip("/"))
+                parsed = urlparse(url)
+                domain = parsed.netloc
 
-            # Insert new URL or ignore if it exists
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO scrape
-                (ticket_id, url, status, domain, depth, queued_at)
-                VALUES (?, ?, ?, ?, ?, strftime('%s','now'))
-                """,
-                (ticket_id, url, PageStatus.QUEUED.value, domain, depth),
-            )
+                # Insert new URL or ignore if it exists
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO scrape
+                    (ticket_id, url, status, domain, depth, queued_at)
+                    VALUES (?, ?, ?, ?, ?, strftime('%s','now'))
+                    """,
+                    (ticket_id, url, PageStatus.QUEUED.value, domain, depth),
+                )
 
-            # Reset error status if re-adding
-            conn.execute(
-                """
-                UPDATE scrape
-                SET status = ?, error_msg = NULL, error_type = NULL
-                WHERE ticket_id = ? AND url = ? AND status = ?
-                """,
-                (PageStatus.QUEUED.value, ticket_id, url, PageStatus.ERROR.value),
-            )
+                # Reset error status if re-adding
+                conn.execute(
+                    """
+                    UPDATE scrape
+                    SET status = ?, error_msg = NULL, error_type = NULL
+                    WHERE ticket_id = ? AND url = ? AND status = ?
+                    """,
+                    (PageStatus.QUEUED.value, ticket_id, url, PageStatus.ERROR.value),
+                )
 
-            # Ensure domain exists in rate limit table
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO domain_rate_limit (domain, last_access, crawl_delay)
-                VALUES (?, 0, 1)
-                """,
-                (domain,),
-            )
+                # Ensure domain exists in rate limit table
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO domain_rate_limit (domain, last_access, crawl_delay)
+                    VALUES (?, 0, 1)
+                    """,
+                    (domain,),
+                )
+
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
 
 def get_next_urls(
@@ -558,73 +573,81 @@ def get_next_urls(
     domains_used = set()
 
     with sqlite3.connect(DB_PATH) as conn:
-        # Query includes URLs from each domain respecting rate limits
-        if respect_rate_limits:
-            # First find eligible domains that respect rate limits
-            rows = conn.execute(
-                """
-                SELECT s.url, s.domain, d.last_access, d.crawl_delay
-                FROM scrape s
-                JOIN domain_rate_limit d ON s.domain = d.domain
-                WHERE s.ticket_id = ?
-                  AND (s.status = ? OR (s.status = ? AND s.attempts < ?))
-                ORDER BY d.last_access ASC
-                """,
-                (ticket_id, PageStatus.QUEUED.value, PageStatus.ERROR.value, scrape_retries),
-            ).fetchall()
-
-            # Process each row, respecting rate limits
-            for row in rows:
-                url, domain, last_access, crawl_delay = row
-
-                # Skip if we already have a URL from this domain in the batch
-                if domain in domains_used:
-                    continue
-
-                # Skip if rate limit not elapsed
-                if last_access > 0 and current_time - last_access < crawl_delay:
-                    continue
-
-                # Add URL to batch
-                urls.append(url)
-                domains_used.add(domain)
-
-                # Update last access time for this domain
-                conn.execute(
+        # Use BEGIN IMMEDIATE to acquire a write lock immediately and prevent race conditions
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            # Query includes URLs from each domain respecting rate limits
+            if respect_rate_limits:
+                # First find eligible domains that respect rate limits
+                rows = conn.execute(
                     """
-                    UPDATE domain_rate_limit
-                    SET last_access = ?
-                    WHERE domain = ?
+                    SELECT s.url, s.domain, d.last_access, d.crawl_delay
+                    FROM scrape s
+                    JOIN domain_rate_limit d ON s.domain = d.domain
+                    WHERE s.ticket_id = ?
+                      AND (s.status = ? OR (s.status = ? AND s.attempts < ?))
+                    ORDER BY d.last_access ASC
                     """,
-                    (current_time, domain),
+                    (ticket_id, PageStatus.QUEUED.value, PageStatus.ERROR.value, scrape_retries),
+                ).fetchall()
+
+                # Process each row, respecting rate limits
+                for row in rows:
+                    url, domain, last_access, crawl_delay = row
+
+                    # Skip if we already have a URL from this domain in the batch
+                    if domain in domains_used:
+                        continue
+
+                    # Skip if rate limit not elapsed
+                    if last_access > 0 and current_time - last_access < crawl_delay:
+                        continue
+
+                    # Add URL to batch
+                    urls.append(url)
+                    domains_used.add(domain)
+
+                    # Update last access time for this domain
+                    conn.execute(
+                        """
+                        UPDATE domain_rate_limit
+                        SET last_access = ?
+                        WHERE domain = ?
+                        """,
+                        (current_time, domain),
+                    )
+
+                    # Stop if we have enough URLs
+                    if len(urls) >= crawl_batch_size:
+                        break
+            else:
+                # Simple version that doesn't respect rate limits
+                rows = conn.execute(
+                    """
+                    SELECT url FROM scrape
+                    WHERE ticket_id = ? AND (status = ? OR (status = ? AND attempts < ?))
+                    LIMIT ?
+                    """,
+                    (ticket_id, PageStatus.QUEUED.value, PageStatus.ERROR.value, scrape_retries, crawl_batch_size),
+                ).fetchall()
+                urls = [row[0] for row in rows]
+
+            # Mark selected URLs as active
+            if urls:
+                placeholders = ", ".join("?" for _ in urls)
+                conn.execute(
+                    f"""
+                    UPDATE scrape
+                    SET status = ?, attempts = attempts + 1, last_processed_at = strftime('%s','now')
+                    WHERE ticket_id = ? AND url IN ({placeholders})
+                    """,
+                    [PageStatus.ACTIVE.value, ticket_id] + urls,
                 )
 
-                # Stop if we have enough URLs
-                if len(urls) >= crawl_batch_size:
-                    break
-        else:
-            # Simple version that doesn't respect rate limits
-            rows = conn.execute(
-                """
-                SELECT url FROM scrape
-                WHERE ticket_id = ? AND (status = ? OR (status = ? AND attempts < ?))
-                LIMIT ?
-                """,
-                (ticket_id, PageStatus.QUEUED.value, PageStatus.ERROR.value, scrape_retries, crawl_batch_size),
-            ).fetchall()
-            urls = [row[0] for row in rows]
-
-        # Mark selected URLs as active
-        if urls:
-            placeholders = ", ".join("?" for _ in urls)
-            conn.execute(
-                f"""
-                UPDATE scrape
-                SET status = ?, attempts = attempts + 1, last_processed_at = strftime('%s','now')
-                WHERE ticket_id = ? AND url IN ({placeholders})
-                """,
-                [PageStatus.ACTIVE.value, ticket_id] + urls,
-            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
     return urls
 

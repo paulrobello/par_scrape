@@ -254,6 +254,15 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
 
 
 ## Whats New
+- Version 0.8.2
+  - Updated all dependencies to latest versions (anthropic, chromadb, fastapi, selenium, and more)
+  - Fixed critical race conditions in database operations:
+    - `get_next_urls()`: Now uses atomic transactions to prevent duplicate URL processing in concurrent scenarios
+    - `add_to_queue()`: Made INSERT and UPDATE operations atomic
+    - `ROBOTS_PARSERS`: Added thread-safe locking for concurrent access
+  - Fixed logic error in crawl_delay initialization that affected all domains instead of just the target
+  - Improved error handling for file operations with proper UTF-8 encoding
+  - Enhanced concurrency safety for multi-threaded/multi-process crawling
 - Version 0.8.1
   - Updated dependencies (ruff 0.14.2, pyright 1.1.407)
   - Ensured compatibility with Python 3.13 (now the default version)
