@@ -411,10 +411,10 @@ def main(
                     start_time = time.time()
                     num_pages: int = 0
                     base_output_folder = Path("./output")
-                    # Set initial crawl delay for all domains
+                    # Set initial crawl delay for the starting domain
                     if respect_rate_limits and crawl_delay > 1:
-                        with sqlite3.connect(DB_PATH) as conn:
-                            conn.execute("UPDATE domain_rate_limit SET crawl_delay = ?", (crawl_delay,))
+                        initial_domain = urlparse(url).netloc
+                        set_crawl_delay(initial_domain, crawl_delay)
 
                     while num_pages < crawl_max_pages:
                         # Get queue statistics
@@ -564,8 +564,13 @@ def main(
                                     # Display output if requested
                                     if display_output:
                                         if display_output.value in file_paths:
-                                            content = file_paths[display_output.value].read_text()
-                                            display_formatted_output(content, display_output, console_out)
+                                            try:
+                                                content = file_paths[display_output.value].read_text(encoding="utf-8")
+                                                display_formatted_output(content, display_output, console_out)
+                                            except Exception as e:
+                                                console_out.print(
+                                                    f"[bold red]Error reading output file: {str(e)}[/bold red]"
+                                                )
                                         else:
                                             console_out.print(
                                                 f"[bold red]Invalid output type: {display_output.value}[/bold red]"
