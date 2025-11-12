@@ -13,3 +13,15 @@ class CrawlConfigError(ParScrapeError):
 class ProviderConfigError(ParScrapeError):
     """Raised when AI provider or model configuration is invalid."""
     pass
+
+class InvalidURLError(Exception):
+    """Raised when a URL is invalid."""
+    pass
+
+class ScrapeError(Exception):
+    """Raised when a scraping operation fails."""
+    pass
+
+class RobotError(Exception):
+    """Raised when there is a failure parsing or reading robots.txt."""
+    pass

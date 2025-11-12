@@ -34,7 +34,7 @@ def test_save_raw_data_creates_file_and_logs(tmp_path, mocker, as_dir):
     result_path = save_raw_data("hello world", output_base)
 
     assert result_path == expected_path
-    assert result_path.read_text() == "hello world"
+    assert result_path.read_text(encoding="utf-8") == "hello world"
     mock_print.assert_called_once()
 
 
@@ -61,7 +61,7 @@ def test_create_dynamic_model_and_container_basic():
 def test_format_data_success(tmp_path, mocker):
     # Prepare prompt file
     prompt_path = tmp_path / "prompt.md"
-    prompt_path.write_text("system prompt")
+    prompt_path.write_text("system prompt", encoding="utf-8")
 
     # Dynamic models
     DynamicModel = create_dynamic_model(["title"])
@@ -99,7 +99,7 @@ def test_format_data_success(tmp_path, mocker):
 
 def test_format_data_failure_returns_empty_container(tmp_path, mocker):
     prompt_path = tmp_path / "prompt.md"
-    prompt_path.write_text("system prompt")
+    prompt_path.write_text("system prompt", encoding="utf-8")
 
     DynamicModel = create_dynamic_model(["title"])
     ContainerModel = create_container_model(DynamicModel)

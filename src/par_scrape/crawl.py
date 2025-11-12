@@ -14,6 +14,7 @@ from par_ai_core.web_tools import normalize_url
 from rich.console import Console
 
 from par_scrape.enums import OutputFormat
+from par_scrape.exceptions import InvalidURLError, ScrapeError, RobotError
 
 
 def clean_url_of_ticket_id(url: str, ticket_id: str) -> str:
@@ -129,18 +130,6 @@ class ErrorType(str, Enum):
     TIMEOUT = "timeout"
     OTHER = "other"
 
-class InvalidURLError(Exception):
-    """Raised when a URL is invalid."""
-    pass
-
-class ScrapeError(Exception):
-    """Raised when a scraping operation fails."""
-    pass
-
-class RobotError(Exception):
-    """Raised when there is a failure parsing or reading robots.txt."""
-    pass
-
 def is_valid_url(url: str) -> bool:
     """
     Validate if a URL is properly formatted and has a supported scheme.
@@ -215,9 +204,6 @@ def check_robots_txt(url: str, user_agent: str = DEFAULT_USER_AGENT) -> bool:
 
     Returns:
         bool: True if the URL is allowed, False if disallowed
-
-    Raises:
-        RobotError: If there is a failure parsing or reading robots.txt
     """
     try:
         parsed_url = urlparse(url)
@@ -317,11 +303,9 @@ def extract_links(
                 full_url = urljoin(base_url, href)
 
                 # Validate the URL
-                try:
-                    if not is_valid_url(full_url):
-                        raise InvalidURLError(f"Invalid URL: {full_url}")
-                except InvalidURLError as e:
-                    print(f"[Error] {e}")
+                if not is_valid_url(full_url):
+                    if console:
+                        console.print(f"[yellow]Invalid URL: {full_url}[/yellow]")
                     continue
 
                 parsed = urlparse(full_url)
@@ -350,7 +334,7 @@ def extract_links(
                             if not check_robots_txt(normalized_url):
                                 if console:
                                     console.print(f"[yellow]Skipping disallowed URL: {normalized_url}[/yellow]")
-                            continue
+                                continue
                         except RobotError as e:
                             if console:
                                 console.print(f"Robots.txt check failed: {str(e)}")
@@ -547,10 +531,7 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
                 url = normalize_url(url.rstrip("/"))
                 parsed = urlparse(url)
                 domain = parsed.netloc
-                # Normalize URL before adding
-                url = normalize_url(url.rstrip("/"))
-                parsed = urlparse(url)
-                domain = parsed.netloc
+                
 
                 # Insert new URL or ignore if it exists
                 conn.execute(
