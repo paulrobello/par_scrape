@@ -129,6 +129,17 @@ class ErrorType(str, Enum):
     TIMEOUT = "timeout"
     OTHER = "other"
 
+class InvalidURLError(Exception):
+    """Raised when a URL is invalid."""
+    pass
+
+class ScrapeError(Exception):
+    """Raised when a scraping operation fails."""
+    pass
+
+class RobotError(Exception):
+    """Raised when there is a failure parsing or reading robots.txt."""
+    pass
 
 def is_valid_url(url: str) -> bool:
     """
@@ -143,7 +154,7 @@ def is_valid_url(url: str) -> bool:
     try:
         parsed = urlparse(url)
         return all([parsed.scheme in ("http", "https"), parsed.netloc])
-    except Exception:
+    except Exception as e:
         return False
 
 
@@ -204,6 +215,9 @@ def check_robots_txt(url: str, user_agent: str = DEFAULT_USER_AGENT) -> bool:
 
     Returns:
         bool: True if the URL is allowed, False if disallowed
+
+    Raises:
+        RobotError: If there is a failure parsing or reading robots.txt
     """
     try:
         parsed_url = urlparse(url)
@@ -303,7 +317,11 @@ def extract_links(
                 full_url = urljoin(base_url, href)
 
                 # Validate the URL
-                if not is_valid_url(full_url):
+                try:
+                    if not is_valid_url(full_url):
+                        raise InvalidURLError(f"Invalid URL: {full_url}")
+                except InvalidURLError as e:
+                    print(f"[Error] {e}")
                     continue
 
                 parsed = urlparse(full_url)
@@ -327,10 +345,16 @@ def extract_links(
                         continue
 
                     # Check robots.txt
-                    if respect_robots and not check_robots_txt(normalized_url):
-                        if console:
-                            console.print(f"[yellow]Skipping disallowed URL: {normalized_url}[/yellow]")
-                        continue
+                    if respect_robots: 
+                        try: 
+                            if not check_robots_txt(normalized_url):
+                                if console:
+                                    console.print(f"[yellow]Skipping disallowed URL: {normalized_url}[/yellow]")
+                            continue
+                        except RobotError as e:
+                            if console:
+                                console.print(f"Robots.txt check failed: {str(e)}")
+                            continue
 
                     links.add(normalized_url)
                 # PAGINATED crawl type implementation would go here
@@ -500,7 +524,13 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
         ticket_id: Unique identifier for the crawl job
         urls: Collection of URLs to add to the queue
         depth: Crawl depth of these URLs (default: 0 for starting URLs)
+    
+    Raises:
+        InvalidURLError: If any of the provided URLs are invalid.
+        ScrapeError: If there is an error processing a URL.
     """
+
+
     with sqlite3.connect(DB_PATH) as conn:
         # Use BEGIN IMMEDIATE for better concurrency control
         conn.execute("BEGIN IMMEDIATE")
@@ -513,6 +543,10 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
                 # Clean URL of any ticket_id occurrences to prevent nesting
                 url = clean_url_of_ticket_id(url, ticket_id)
 
+                # Normalize URL before adding
+                url = normalize_url(url.rstrip("/"))
+                parsed = urlparse(url)
+                domain = parsed.netloc
                 # Normalize URL before adding
                 url = normalize_url(url.rstrip("/"))
                 parsed = urlparse(url)
