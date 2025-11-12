@@ -127,6 +127,46 @@ Validates that JSON, CSV, and Markdown outputs are created correctly
 
 Tests error handling when model_dump returns an unsupported type
 
+tests/test_crawl.py
+
+Uses pytest.mark.parametrize to test multiple input/output cases for:
+
+is_valud_url
+
+clean_url_of_ticket_id
+
+check_robots_txt
+
+get_next_urls
+
+extract_links
+
+should_exlude_url
+
+get_url_output_folder
+
+set_crawl_delay
+
+get_queue_size
+
+get_queue_stats
+
+add_to_queue
+
+mark_complete
+
+mark_error
+
+tests edge cases of invalid urls for 
+
+mark_complete
+
+mark_error
+
+tests database initialization for 
+
+init_db
+
 Configuration File
 
 pyproject.toml
@@ -161,7 +201,8 @@ File	Coverage	Notes
 src/par_scrape/utils.py	~96%	All helper functions tested with valid and invalid cases
 src/par_scrape/scrape_data.py	~73%	Core functions tested, including file I/O and LLM mocks
 src/par_scrape/exceptions.py	100%	Fully covered
-Overall project coverage	~21%	Focused on core logic; CLI and crawl modules excluded
+src/par_scrape/crawl.py     73%     Core functions tested
+Overall project coverage	~52%	Focused on core logic; CLI and crawl modules excluded
 
 To view a detailed coverage report:
 
