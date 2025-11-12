@@ -3,6 +3,7 @@ from pathlib import Path
 from par_scrape import crawl
 from unittest import mock
 import sqlite3
+from rich.console import Console
 from par_scrape.crawl import(
     is_valid_url,
     clean_url_of_ticket_id,
@@ -18,7 +19,7 @@ def db_path(tmp_path):
     return tmp_path / "test.sqlite"
 
 @pytest.fixture
-def console():
+def console()->Console:
     return Console(record=True)
 
 @pytest.fixture
@@ -93,7 +94,7 @@ class TestCrawlFunctions:
         pytest.param("<a href='/page1/Ticket123'>link</a>", "http://example.com", CrawlType.SINGLE_LEVEL, "Ticket123", False, ["http://example.com/page1"], id="full_site_with_ticket_id"),
         pytest.param('<a href="#top">top</a><a href="mailto:test@example.com">email</a>',"http://example.com",CrawlType.SINGLE_LEVEL,"",False,[],id="anchors_and_mailto")
     ])
-    def test_extract_links(self, html, base_url, crawl_type, ticket_id, respect_robots, expected_urls, mocker):
+    def test_extract_links(self, html, base_url, crawl_type, ticket_id, respect_robots, expected_urls, mocker, console):
         mocker.patch("par_scrape.crawl.check_robots_txt", return_value=True)
 
         result = crawl.extract_links(
