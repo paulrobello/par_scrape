@@ -329,12 +329,12 @@ def extract_links(
                         continue
 
                     # Check robots.txt
-                    if respect_robots: 
-                        try: 
+                    if respect_robots:
+                        try:
                             if not check_robots_txt(normalized_url):
                                 if console:
                                     console.print(f"[yellow]Skipping disallowed URL: {normalized_url}[/yellow]")
-                                continue
+                            continue
                         except RobotError as e:
                             if console:
                                 console.print(f"Robots.txt check failed: {str(e)}")
