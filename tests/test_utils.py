@@ -1,35 +1,6 @@
 import pytest
+
 from par_scrape import utils
-from par_scrape.exceptions import CrawlConfigError
-
-
-@pytest.mark.parametrize(
-    "url,expected",
-    [
-        ("https://example.com", "https://example.com"),
-        ("https://example.com/", "https://example.com"),
-        ("https://example.com/test/", "https://example.com/test"),
-    ]
-)
-def test_normalize_url_valid(url, expected):
-    assert utils.normalize_url(url) == expected
-
-
-@pytest.mark.parametrize("url", ["", "notaurl", "http://"])
-def test_normalize_url_invalid(url):
-    with pytest.raises(CrawlConfigError):
-        utils.normalize_url(url)
-
-
-@pytest.mark.parametrize(
-    "url,expected_domain",
-    [
-        ("https://example.com/path", "example.com"),
-        ("http://sub.domain.org/page", "sub.domain.org"),
-    ]
-)
-def test_extract_domain(url, expected_domain):
-    assert utils.extract_domain(url) == expected_domain
 
 
 @pytest.mark.parametrize("items,chunk_size,expected", [

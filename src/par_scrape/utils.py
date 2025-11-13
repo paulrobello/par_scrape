@@ -1,29 +1,4 @@
-from urllib.parse import urlparse
-from par_scrape.exceptions import CrawlConfigError
-
-
-def normalize_url(url: str) -> str:
-    """
-    Normalize URLs to a consistent format (e.g., remove trailing slashes).
-    Raises CrawlConfigError if the URL is invalid or empty.
-    """
-    if not url:
-        raise CrawlConfigError("URL cannot be empty.")
-    parsed = urlparse(url)
-    if not parsed.scheme or not parsed.netloc:
-        raise CrawlConfigError(f"Invalid URL: {url}")
-    return url.rstrip("/")
-
-
-def extract_domain(url: str) -> str:
-    """
-    Extract the domain (netloc) from a URL.
-    Raises CrawlConfigError for invalid URLs.
-    """
-    parsed = urlparse(url)
-    if not parsed.netloc:
-        raise CrawlConfigError(f"Invalid URL: {url}")
-    return parsed.netloc
+"""Utility functions for par_scrape."""
 
 
 def chunk_list(items: list, chunk_size: int) -> list[list]:
