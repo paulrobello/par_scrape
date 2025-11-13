@@ -7,13 +7,12 @@ from pydantic import BaseModel
 
 from par_scrape.enums import OutputFormat
 from par_scrape.scrape_data import (
-    save_raw_data,
-    create_dynamic_model,
     create_container_model,
+    create_dynamic_model,
     format_data,
     save_formatted_data,
+    save_raw_data,
 )
-
 
 # ---------- save_raw_data ----------
 

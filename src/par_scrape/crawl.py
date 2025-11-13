@@ -14,15 +14,7 @@ from par_ai_core.web_tools import normalize_url
 from rich.console import Console
 
 from par_scrape.enums import OutputFormat
-from par_scrape.exceptions import (
-    ParScrapeError,
-    CrawlConfigError,
-    ProviderConfigError,
-    InvalidURLError,
-    ScrapeError,
-    RobotError,
-)
-
+from par_scrape.exceptions import RobotError
 
 
 def clean_url_of_ticket_id(url: str, ticket_id: str) -> str:
@@ -151,7 +143,7 @@ def is_valid_url(url: str) -> bool:
     try:
         parsed = urlparse(url)
         return all([parsed.scheme in ("http", "https"), parsed.netloc])
-    except Exception as e:
+    except Exception:
         return False
 
 
@@ -342,7 +334,7 @@ def extract_links(
                             if not check_robots_txt(normalized_url):
                                 if console:
                                     console.print(f"[yellow]Skipping disallowed URL: {normalized_url}[/yellow]")
-                            continue
+                                continue
                         except RobotError as e:
                             if console:
                                 console.print(f"Robots.txt check failed: {str(e)}")
@@ -516,10 +508,10 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
         ticket_id: Unique identifier for the crawl job
         urls: Collection of URLs to add to the queue
         depth: Crawl depth of these URLs (default: 0 for starting URLs)
-    
-    Raises:
-        InvalidURLError: If any of the provided URLs are invalid.
-        ScrapeError: If there is an error processing a URL.
+
+    Note:
+        Invalid URLs are silently skipped and not added to the queue.
+        URLs already in error state will have their status reset to QUEUED.
     """
 
 
@@ -539,7 +531,7 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
                 url = normalize_url(url.rstrip("/"))
                 parsed = urlparse(url)
                 domain = parsed.netloc
-                
+
 
                 # Insert new URL or ignore if it exists
                 conn.execute(

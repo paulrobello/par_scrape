@@ -1,19 +1,19 @@
-import pytest
-from pathlib import Path
-from par_scrape import crawl
-from unittest import mock
 import sqlite3
+from pathlib import Path
+from unittest import mock
+
+import pytest
 from rich.console import Console
-from par_scrape.crawl import(
-    is_valid_url,
-    clean_url_of_ticket_id,
-    check_robots_txt,
-    add_to_queue,
-    get_next_urls,
-    PageStatus,
+
+from par_scrape import crawl
+from par_scrape.crawl import (
     CrawlType,
-    ROBOTS_PARSERS,
+    PageStatus,
+    clean_url_of_ticket_id,
+    is_valid_url,
 )
+
+
 @pytest.fixture
 def db_path(tmp_path):
     return tmp_path / "test.sqlite"
@@ -31,7 +31,7 @@ def test_db(tmp_path):
     db_file = tmp_path / "test.sqlite"
     return db_file
 
-    
+
 
 class TestCrawlFunctions:
 
@@ -44,7 +44,7 @@ class TestCrawlFunctions:
     def test_is_valid_url(self, url, expected):
         assert is_valid_url(url) == expected
 
-    @pytest.mark.parametrize("url, ticket_id, expected", [ 
+    @pytest.mark.parametrize("url, ticket_id, expected", [
         pytest.param("http://example.com/page?ticket=12345", "12345", "http://example.com/page", id="with_ticket"),
         pytest.param("http://example.com/page", "", "http://example.com/page", id="without_ticket"),
         pytest.param("http://example.com/page?param=value&ticket=67890", "67890", "http://example.com/page?param=value", id="with_other_params"),
@@ -60,7 +60,7 @@ class TestCrawlFunctions:
     ])
     def test_check_robots_txt(self, url, parser_setup, expected, mocker):
         mocker.patch.dict(crawl.ROBOTS_PARSERS, clear=True)
-        
+
         if parser_setup:
             domain = crawl.urlparse(url).netloc
             mock_rp = mocker.Mock()
@@ -118,8 +118,8 @@ class TestCrawlFunctions:
 
     @pytest.mark.parametrize("ticket_id, url, expected", [
         pytest.param("Ticket123", "http://example.com", ["Ticket123", "example.com"], id="basic_case"),
-        pytest.param("", "http://example.com", ["example.com"], id="no_ticket_id"),  
-        pytest.param("Ticket123", "http://example.com/page", ["Ticket123", "example.com", "page"], id="ticket and page"),  
+        pytest.param("", "http://example.com", ["example.com"], id="no_ticket_id"),
+        pytest.param("Ticket123", "http://example.com/page", ["Ticket123", "example.com", "page"], id="ticket and page"),
     ])
     def test_get_url_output_folder(self, tmp_path, ticket_id, url, expected):
         result = crawl.get_url_output_folder(tmp_path, ticket_id, url)
@@ -155,7 +155,7 @@ class TestQueueFunctions:
 
             size = crawl.get_queue_size(ticket_id)
             assert size == expected_size
-    
+
     @pytest.mark.parametrize("ticket_id, queue, completed, expected_result", [
         pytest.param("Ticket1", ["http://example.com/page1", "http://example.com/page2"], "", {PageStatus.QUEUED.value: 2, PageStatus.ACTIVE.value: 0, PageStatus.COMPLETED.value: 0, PageStatus.ERROR.value: 0}, id="none_completed"),
         pytest.param("Ticket2", ["http://example.com/page1", "http://example.com/page2"], ["http://example.com/page2"], {PageStatus.QUEUED.value: 1, PageStatus.ACTIVE.value: 0, PageStatus.COMPLETED.value: 1, PageStatus.ERROR.value: 0}, id="completed"),
@@ -208,7 +208,7 @@ class TestMarkFunctions:
                 row = conn.execute("SELECT status FROM scrape WHERE ticket_id = ? AND url = ?", (ticket_id, url)).fetchone()
                 assert row is not None
                 assert row[0] == PageStatus.COMPLETED.value
-    
+
     @pytest.mark.parametrize("ticket_id, url, error_msg, error_type",[
         pytest.param("Ticket1", "http://example.com/page1", "Page Not Found", crawl.ErrorType.OTHER, id="basic_case"),
         pytest.param("", "http://example.com/page2", "Timeout Error", crawl.ErrorType.OTHER, id="no_ticket_id"),
@@ -244,7 +244,7 @@ class TestMarkFunctions:
                 assert row is None
 
 
-    
+
 
 
 def test_init_db(tmp_path):
