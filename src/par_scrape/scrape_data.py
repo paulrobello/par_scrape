@@ -216,4 +216,3 @@ def save_formatted_data(
     except Exception as e:
         console_out.print(f"[bold red]Error creating DataFrame or saving files:[/bold red] {str(e)}")
         return None, {}
-    

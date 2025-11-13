@@ -14,7 +14,15 @@ from par_ai_core.web_tools import normalize_url
 from rich.console import Console
 
 from par_scrape.enums import OutputFormat
-from par_scrape.exceptions import InvalidURLError, ScrapeError, RobotError
+from par_scrape.exceptions import (
+    ParScrapeError,
+    CrawlConfigError,
+    ProviderConfigError,
+    InvalidURLError,
+    ScrapeError,
+    RobotError,
+)
+
 
 
 def clean_url_of_ticket_id(url: str, ticket_id: str) -> str:

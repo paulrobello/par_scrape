@@ -5,7 +5,6 @@ import pandas as pd
 import pytest
 from pydantic import BaseModel
 
-from par_scrape import scrape_data
 from par_scrape.enums import OutputFormat
 from par_scrape.scrape_data import (
     save_raw_data,
@@ -34,7 +33,7 @@ def test_save_raw_data_creates_file_and_logs(tmp_path, mocker, as_dir):
     result_path = save_raw_data("hello world", output_base)
 
     assert result_path == expected_path
-    assert result_path.read_text(encoding="utf-8") == "hello world"
+    assert result_path.read_text(encoding='utf-8') == "hello world"
     mock_print.assert_called_once()
 
 
