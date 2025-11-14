@@ -77,3 +77,4 @@ __pypackages__/
 /src/par_scrape/jobs.sqlite
 **/.DS_Store
 PR_*.md
+*~
