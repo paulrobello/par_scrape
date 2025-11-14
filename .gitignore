@@ -75,3 +75,4 @@ __pypackages__/
 /.ruff_cache/
 /src/par_scrape/pages/
 /src/par_scrape/jobs.sqlite
+**/.DS_Store

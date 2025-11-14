@@ -14,6 +14,7 @@ from par_ai_core.web_tools import normalize_url
 from rich.console import Console
 
 from par_scrape.enums import OutputFormat
+from par_scrape.exceptions import RobotError
 
 
 def clean_url_of_ticket_id(url: str, ticket_id: str) -> str:
@@ -128,7 +129,6 @@ class ErrorType(str, Enum):
     INVALID_URL = "invalid_url"
     TIMEOUT = "timeout"
     OTHER = "other"
-
 
 def is_valid_url(url: str) -> bool:
     """
@@ -304,6 +304,8 @@ def extract_links(
 
                 # Validate the URL
                 if not is_valid_url(full_url):
+                    if console:
+                        console.print(f"[yellow]Invalid URL: {full_url}[/yellow]")
                     continue
 
                 parsed = urlparse(full_url)
@@ -327,10 +329,16 @@ def extract_links(
                         continue
 
                     # Check robots.txt
-                    if respect_robots and not check_robots_txt(normalized_url):
-                        if console:
-                            console.print(f"[yellow]Skipping disallowed URL: {normalized_url}[/yellow]")
-                        continue
+                    if respect_robots:
+                        try:
+                            if not check_robots_txt(normalized_url):
+                                if console:
+                                    console.print(f"[yellow]Skipping disallowed URL: {normalized_url}[/yellow]")
+                                continue
+                        except RobotError as e:
+                            if console:
+                                console.print(f"Robots.txt check failed: {str(e)}")
+                            continue
 
                     links.add(normalized_url)
                 # PAGINATED crawl type implementation would go here
@@ -500,7 +508,13 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
         ticket_id: Unique identifier for the crawl job
         urls: Collection of URLs to add to the queue
         depth: Crawl depth of these URLs (default: 0 for starting URLs)
+
+    Note:
+        Invalid URLs are silently skipped and not added to the queue.
+        URLs already in error state will have their status reset to QUEUED.
     """
+
+
     with sqlite3.connect(DB_PATH) as conn:
         # Use BEGIN IMMEDIATE for better concurrency control
         conn.execute("BEGIN IMMEDIATE")
@@ -517,6 +531,7 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
                 url = normalize_url(url.rstrip("/"))
                 parsed = urlparse(url)
                 domain = parsed.netloc
+
 
                 # Insert new URL or ignore if it exists
                 conn.execute(
