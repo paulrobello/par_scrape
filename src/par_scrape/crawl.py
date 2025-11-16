@@ -130,6 +130,7 @@ class ErrorType(str, Enum):
     TIMEOUT = "timeout"
     OTHER = "other"
 
+
 def is_valid_url(url: str) -> bool:
     """
     Validate if a URL is properly formatted and has a supported scheme.
@@ -514,7 +515,6 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
         URLs already in error state will have their status reset to QUEUED.
     """
 
-
     with sqlite3.connect(DB_PATH) as conn:
         # Use BEGIN IMMEDIATE for better concurrency control
         conn.execute("BEGIN IMMEDIATE")
@@ -531,7 +531,6 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
                 url = normalize_url(url.rstrip("/"))
                 parsed = urlparse(url)
                 domain = parsed.netloc
-
 
                 # Insert new URL or ignore if it exists
                 conn.execute(

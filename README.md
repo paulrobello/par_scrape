@@ -60,7 +60,7 @@ The options `--crawl-max-pages` / `-M` can be used to limit the total number of 
 
 ## Prerequisites
 
-To install PAR Scrape, make sure you have Python 3.11 or higher. Python 3.13 is the default and recommended version (supports Python 3.11-3.13).
+To install PAR Scrape, make sure you have Python 3.11 or higher. Python 3.14 is the default and recommended version (supports Python 3.11-3.14).
 
 ### [uv](https://pypi.org/project/uv/) is recommended
 
@@ -254,6 +254,12 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
 
 
 ## Whats New
+- Version 0.8.3
+  - Updated dependencies and ensured Python 3.14 compatibility
+  - Python 3.14 is now the default and recommended version
+  - Maintains backward compatibility with Python 3.11, 3.12, and 3.13
+  - Updated Pyright configuration to target Python 3.14
+  - Updated all CI/CD workflows to use Python 3.14
 - Version 0.8.2
   - Updated all dependencies to latest versions (anthropic, chromadb, fastapi, selenium, and more)
   - Fixed critical race conditions in database operations:

@@ -7,7 +7,7 @@ def chunk_list(items: list, chunk_size: int) -> list[list]:
     """
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
-    return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
+    return [items[i : i + chunk_size] for i in range(0, len(items), chunk_size)]
 
 
 def safe_divide(a: float, b: float) -> float:
