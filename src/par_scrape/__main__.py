@@ -64,9 +64,9 @@ if old_env_path.exists():
         old_env_path.rename(new_env_path)
 
 # Load the .env file from the project folder
-load_dotenv(dotenv_path=".env")
+load_dotenv(dotenv_path=".env", override=True)
 # Load the new .env file from the users home folder
-load_dotenv(dotenv_path=new_env_path)
+load_dotenv(dotenv_path=new_env_path, override=True)
 
 # Initialize Typer app
 app = typer.Typer(help="Web scraping tool with options for Selenium or Playwright")
