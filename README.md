@@ -315,7 +315,11 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
 - Version 0.4.8:
   - Added Anthropic prompt cache option.
 - Version 0.4.7:
-  - BREAKING CHANGE: --pricing cli option now takes a string value of 'details', 'cost', or 'none'.
+  - Version 0.9.0:
+  - Major dependency updates including langchain 1.2, pandas 3.0, google-genai (replaces google-generativeai)
+  - Updated anthropic, groq, openai, playwright and many other packages
+  - All tests passing with updated dependencies
+- BREAKING CHANGE: --pricing cli option now takes a string value of 'details', 'cost', or 'none'.
   - Added pool of user agents that gets randomly pulled from.
   - Updating pricing data.
   - Pricing token capture and compute now much more accurate.
