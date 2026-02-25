@@ -254,6 +254,13 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
 
 
 ## Whats New
+- Version 0.9.1
+  - **Bug fix**: `--output-folder` argument was silently ignored; output always went to `./output`
+  - **Bug fix**: `--display-output` never showed content due to wrong internal dict key lookup
+  - **Bug fix**: `robots.txt` fetch had no timeout; can no longer hang the crawl indefinitely
+  - Removed `strenum` third-party dependency (replaced with stdlib `enum.StrEnum`)
+  - `make checkall` now runs tests; added `make test` and `make fmt` targets
+  - Code quality and type annotation improvements throughout
 - Version 0.8.3
   - Updated dependencies and ensured Python 3.14 compatibility
   - Python 3.14 is now the default and recommended version
