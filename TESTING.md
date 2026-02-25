@@ -1,263 +1,133 @@
 # Testing Guide
 
-This document describes how to run the test suite for `par_scrape`, what files were modified, and the current test coverage.
+This document describes how to run the test suite for `par_scrape`, what is covered, and the current test coverage.
 
 ## 1. Environment Setup
 
 The project uses `uv` for dependency management and `pytest` for testing.
 
-From the project root (where `pyproject.toml` is located), install the development (including test) dependencies with:
-
-bash
-uv sync --group dev
-You do not need to activate a virtual environment manually when using uv run. uv will create and manage .venv for you.
-
-2. Running Tests
-Run the full test suite with:
-
-bash
-Copy code
-uv run pytest
-To see verbose output:
-
-bash
-Copy code
-uv run pytest -v
-To run only a specific test file:
-
-bash
-Copy code
-uv run pytest tests/test_utils.py -v
-uv run pytest tests/test_scrape_data.py -v
-uv run pytest tests/test_crawl.py -v
-3. Pytest Configuration
-Pytest is configured in pyproject.toml. Important settings:
-
-testpaths = ["tests"] ensures all tests live under the tests directory.
-
-python_files = ["test_*.py"] ensures test files follow the test_*.py naming pattern.
-
-addopts = "-v --cov=par_scrape --cov-report=term-missing" enables verbose mode and coverage reporting by default.
-
-pythonpath = ["src"] allows direct imports from par_scrape without needing relative paths.
-
-4. Files Modified and Created
-Source Files
-src/par_scrape/exceptions.py
-Added:
-
-ParScrapeError (base exception)
-
-CrawlConfigError for invalid crawl or scrape configuration
-
-ProviderConfigError for invalid AI provider or model configuration
-
-Additional crawl related exceptions moved here from crawl.py:
-
-InvalidURLError
-
-ScrapeError
-
-RobotError
-
-src/par_scrape/utils.py
-Added several helper functions:
-
-normalize_url
-
-extract_domain
-
-chunk_list
-
-safe_divide
-
-merge_dicts
-
-These functions normalize URLs, extract domains, split lists into chunks, safely divide numbers, and merge dictionaries. They are now covered by unit tests with both valid and edge case inputs.
-
-src/par_scrape/scrape_data.py
-No major logic changes, but this file is now covered by tests. Tests cover:
-
-save_raw_data
-
-create_dynamic_model
-
-create_container_model
-
-format_data
-
-save_formatted_data
-
-The tests use mocks for the LLM integration and verify that output files (JSON, CSV, Markdown) are created correctly.
-
-src/par_scrape/crawl.py
-Additional exception handling and small logic fixes were added here, including:
-
-Using the custom exceptions from exceptions.py.
-
-Fixing the extract_links robots logic so that URLs are only skipped when disallowed by robots.txt.
-
-Removing duplicated code in add_to_queue.
-
-Replacing a raise and immediately catch pattern with simpler conditional checks and console.print.
-
-Test Files
-tests/test_utils.py
-Uses pytest.mark.parametrize to test multiple input and output cases for:
-
-normalize_url
-
-extract_domain
-
-chunk_list
-
-safe_divide
-
-merge_dicts
-
-Includes edge and error condition tests, such as:
-
-Invalid URLs
-
-Invalid chunk sizes
-
-Division by zero
-
-tests/test_scrape_data.py
-Covers the data formatting and persistence utilities:
-
-Tests file creation and dynamic Pydantic model generation.
-
-Mocks LLM calls using pytest-mock.
-
-Covers both success and error paths for:
-
-save_raw_data
-
-format_data
-
-save_formatted_data
-
-Validates that JSON, CSV, and Markdown outputs are created correctly.
-
-Tests error handling when model_dump returns an unsupported type (raises ValueError).
-
-tests/test_crawl.py
-Uses pytest.mark.parametrize and fixtures to exercise core crawling helpers and queue logic:
-
-Functions covered include:
-
-is_valid_url
-
-clean_url_of_ticket_id
-
-check_robots_txt (with mocked responses)
-
-get_next_urls
-
-extract_links
-
-should_exclude_url
-
-get_url_output_folder
-
-set_crawl_delay
-
-get_queue_size
-
-get_queue_stats
-
-add_to_queue
-
-mark_complete
-
-mark_error
-
-init_db (database initialization)
-
-Edge cases tested include:
-
-Invalid URLs
-
-URLs with ticket ids
-
-Empty queues
-
-Missing URLs in mark_complete and mark_error
-
-Non HTML content and excluded asset types
-
-Configuration File
-pyproject.toml
-Uses [dependency-groups.dev] for development and test dependencies (installed via uv sync --group dev).
-
-[tool.pytest.ini_options] is configured to control test discovery, verbosity, and coverage reporting.
-
-5. Custom Exceptions
-Defined in src/par_scrape/exceptions.py:
-
-ParScrapeError
-Base exception for all project specific errors.
-
-CrawlConfigError
-Raised when crawl or scrape configuration is invalid.
-Examples: missing URL, unsupported crawl type, non positive page limits.
-
-ProviderConfigError
-Raised when AI provider or model configuration is invalid.
-Examples: unsupported provider string, missing model for a given provider.
-
-InvalidURLError, ScrapeError, RobotError
-Crawl related errors used for invalid URLs, scraping failures, and robots.txt issues.
-
-CrawlConfigError is currently used in utils.normalize_url, while ProviderConfigError is reserved for provider and model configuration validation. Crawl specific exceptions are used in crawl.py to keep error handling consistent.
-
-6. Test Coverage Summary
-Results from the latest test run using:
-
-bash
-Copy code
-uv run pytest -v
-which automatically includes coverage reporting via addopts:
-
-File	Coverage	Notes
-src/par_scrape/utils.py	~96%	Helper functions tested with valid and invalid cases
-src/par_scrape/scrape_data.py	~73%	Core functions tested, including file I/O and LLM mocks
-src/par_scrape/exceptions.py	100%	All custom exceptions covered
-src/par_scrape/enums.py	100%	Enum members and values tested
-src/par_scrape/crawl.py	~77%	Core crawling helpers, queue logic, and robots handling
-Overall project coverage	~52%	Focused on core logic; CLI and full crawl orchestration are not yet covered
-
-To view a detailed coverage report in the terminal:
-
-bash
-Copy code
-uv run pytest --cov=par_scrape --cov-report=term-missing
-7. Known Issues and Limitations
-Tests for format_data use mocks rather than calling actual AI APIs.
-
-Coverage focuses on utilities, data formatting, and crawl helpers, not on:
-
-Command line execution in __main__.py
-
-Full end to end crawling flows
-
-Future improvements could include:
-
-Tests for the command line interface in src/par_scrape/__main__.py
-
-Higher level tests for full crawl runs in src/par_scrape/crawl.py
-
-sql
-Copy code
-
-You can:
-
-1. Open `TESTING.md` in your editor.  
-2. Select all, paste this over the top, and save.  
-3. Then:
+From the project root (where `pyproject.toml` is located), install development dependencies with:
 
 ```bash
-git add TESTING.md
-git commit -m "docs: update TESTING.md for uv dev group and 52 percent coverage"
-git push
+uv sync --group dev
+```
+
+You do not need to activate a virtual environment manually when using `uv run`. It creates and manages `.venv` automatically.
+
+## 2. Running Tests
+
+Run the full test suite:
+
+```bash
+uv run pytest
+```
+
+Verbose output:
+
+```bash
+uv run pytest -v
+```
+
+Run a specific test file:
+
+```bash
+uv run pytest tests/test_crawl.py -v
+```
+
+## 3. Pytest Configuration
+
+Pytest is configured in `pyproject.toml` under `[tool.pytest.ini_options]`:
+
+- `testpaths = ["tests"]` — all tests live under `tests/`
+- `python_files = ["test_*.py"]` — test files follow the `test_*.py` naming pattern
+- `addopts = "-v --cov=par_scrape --cov-report=term-missing"` — verbose output and coverage reporting enabled by default
+- `pythonpath = ["src"]` — allows direct imports from `par_scrape` without relative paths
+
+## 4. Source Files Under Test
+
+### `src/par_scrape/exceptions.py`
+
+Custom exception hierarchy:
+
+- `ParScrapeError` — base exception for all project-specific errors
+- `CrawlConfigError` — invalid crawl or scrape configuration
+- `ProviderConfigError` — invalid AI provider or model configuration
+- `InvalidURLError`, `ScrapeError`, `RobotError` — crawl-specific errors
+
+### `src/par_scrape/utils.py`
+
+Helper functions:
+
+- `chunk_list` — splits a list into evenly sized chunks
+- `safe_divide` — divides two numbers, returning 0.0 on division by zero
+- `merge_dicts` — merges two dicts, with the second overwriting keys from the first
+
+### `src/par_scrape/scrape_data.py`
+
+Data formatting and persistence:
+
+- `save_raw_data` — saves markdown content to a file
+- `create_dynamic_model` — builds a Pydantic model from a list of field names
+- `create_container_model` — wraps a model in a list container
+- `format_data` — invokes an LLM to extract structured data
+- `save_formatted_data` — saves extracted data as JSON, CSV, Excel, and/or Markdown
+
+### `src/par_scrape/crawl.py`
+
+Crawl queue and helpers:
+
+- `is_valid_url`, `clean_url_of_ticket_id`, `should_exclude_url`
+- `check_robots_txt` — checks `robots.txt` with a 10-second fetch timeout
+- `extract_links` — extracts and filters links from HTML
+- `get_url_output_folder` — maps a URL to a local output path
+- `init_db`, `add_to_queue`, `get_next_urls`, `get_queue_size`, `get_queue_stats`
+- `mark_complete`, `mark_error`, `set_crawl_delay`
+
+## 5. Test Files
+
+### `tests/test_crawl.py`
+
+Covers core crawling helpers and queue logic using `pytest.mark.parametrize` and fixtures.
+Uses `monkeypatch` and `mock.patch.object` to isolate the SQLite database path.
+
+Edge cases include: invalid URLs, URLs with ticket IDs, empty queues, missing URLs in `mark_complete`/`mark_error`, excluded asset types.
+
+### `tests/test_utils.py` *(if present)*
+
+Covers `chunk_list`, `safe_divide`, and `merge_dicts` with valid, edge-case, and error inputs.
+
+## 6. Custom Exceptions
+
+Defined in `src/par_scrape/exceptions.py`:
+
+| Exception | Description |
+|---|---|
+| `ParScrapeError` | Base exception for all project-specific errors |
+| `CrawlConfigError` | Invalid crawl or scrape configuration |
+| `ProviderConfigError` | Invalid AI provider or model configuration |
+| `InvalidURLError` | URL failed validation |
+| `ScrapeError` | General scraping failure |
+| `RobotError` | `robots.txt` disallowed or fetch failure |
+
+## 7. Test Coverage Summary
+
+| File | Coverage | Notes |
+|---|---|---|
+| `src/par_scrape/exceptions.py` | 100% | All custom exceptions covered |
+| `src/par_scrape/enums.py` | 100% | Enum members and values covered |
+| `src/par_scrape/utils.py` | 100% | All helpers with valid and edge-case inputs |
+| `src/par_scrape/crawl.py` | ~77% | Core helpers and queue logic; full crawl orchestration not covered |
+| `src/par_scrape/scrape_data.py` | ~73% | LLM calls mocked; file I/O and model creation covered |
+| `src/par_scrape/__main__.py` | 0% | CLI orchestration not yet tested |
+| **Overall** | **~51%** | Focused on core logic |
+
+To view a detailed coverage report:
+
+```bash
+uv run pytest --cov=par_scrape --cov-report=term-missing
+```
+
+## 8. Known Limitations
+
+- `format_data` tests use mocks rather than live AI APIs.
+- `__main__.py` has no test coverage (CLI orchestration and full crawl flows).

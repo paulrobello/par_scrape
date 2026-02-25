@@ -1,7 +1,13 @@
 """Utility functions for par_scrape."""
 
+from typing import TypeVar
 
-def chunk_list(items: list, chunk_size: int) -> list[list]:
+KT = TypeVar("KT")
+T = TypeVar("T")
+VT = TypeVar("VT")
+
+
+def chunk_list(items: list[T], chunk_size: int) -> list[list[T]]:
     """
     Split a list into evenly sized chunks.
     """
@@ -20,7 +26,7 @@ def safe_divide(a: float, b: float) -> float:
         return 0.0
 
 
-def merge_dicts(a: dict, b: dict) -> dict:
+def merge_dicts(a: dict[KT, VT], b: dict[KT, VT]) -> dict[KT, VT]:
     """
     Merge two dictionaries, with b overwriting keys from a.
     """
