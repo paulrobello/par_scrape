@@ -88,7 +88,7 @@ class TestCrawlFunctions:
         assert next_urls == expected_next
 
     @pytest.mark.parametrize("html, base_url, crawl_type, ticket_id, respect_robots, expected_urls",[
-        pytest.param("<a href='/page1'>link</a>", "http://example.com", CrawlType.SINGLE_PAGE, "", False, "", id="single_page_no_robots"),
+        pytest.param("<a href='/page1'>link</a>", "http://example.com", CrawlType.SINGLE_PAGE, "", False, [], id="single_page_no_robots"),
         pytest.param("<a href='/page1'>link</a>", "http://example.com", CrawlType.SINGLE_PAGE, "", False, [], id="single_page_with_robots"),
         pytest.param("<a href='/page1'>link</a><a href='/page2'>link2</a>", "http://example.com", CrawlType.SINGLE_LEVEL, "Ticket1", False, ["http://example.com/page1", "http://example.com/page2"], id="full_site_no_robots"),
         pytest.param("<a href='/page1/Ticket123'>link</a>", "http://example.com", CrawlType.SINGLE_LEVEL, "Ticket123", False, ["http://example.com/page1"], id="full_site_with_ticket_id"),

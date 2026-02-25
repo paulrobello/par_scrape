@@ -399,7 +399,7 @@ def main(
 
     with console_out.capture() if silent else nullcontext():
         if cleanup in [CleanupType.BEFORE, CleanupType.BOTH]:
-            if os.path.exists(output_folder):
+            if output_folder.exists():
                 shutil.rmtree(output_folder)
                 console_out.print(f"[bold green]Removed existing output folder: {output_folder}[/bold green]")
         try:
@@ -410,7 +410,7 @@ def main(
                 with console_out.status("[bold green]Starting fetch loop...") as status:
                     start_time = time.time()
                     num_pages: int = 0
-                    base_output_folder = Path("./output")
+                    base_output_folder = output_folder
                     # Set initial crawl delay for the starting domain
                     if respect_rate_limits and crawl_delay > 1:
                         initial_domain = urlparse(url).netloc
@@ -530,7 +530,8 @@ def main(
 
                                     if llm_needed:
                                         status.update("[bold cyan]Extracting data with LLM...")
-                                        assert dynamic_model_container and llm_config
+                                        if dynamic_model_container is None or llm_config is None:
+                                            raise RuntimeError("LLM configuration is required but was not initialized")
                                         formatted_data = format_data(
                                             data=markdown,
                                             dynamic_listings_container=dynamic_model_container,
@@ -563,9 +564,13 @@ def main(
 
                                     # Display output if requested
                                     if display_output:
-                                        if display_output.value in file_paths:
+                                        try:
+                                            output_key = OutputFormat(display_output.value)
+                                        except ValueError:
+                                            output_key = None
+                                        if output_key is not None and output_key in file_paths:
                                             try:
-                                                content = file_paths[display_output.value].read_text(encoding="utf-8")
+                                                content = file_paths[output_key].read_text(encoding="utf-8")
                                                 display_formatted_output(content, display_output, console_out)
                                             except Exception as e:
                                                 console_out.print(
@@ -660,7 +665,7 @@ def main(
         finally:
             if cleanup in [CleanupType.BOTH, CleanupType.AFTER]:
                 with console_out.status("[bold yellow]Cleaning up..."):
-                    if os.path.exists(output_folder):
+                    if output_folder.exists():
                         shutil.rmtree(output_folder)
                         console_out.print(
                             f"[bold green]Removed output folder and its contents: {output_folder}[/bold green]"

@@ -1,6 +1,6 @@
 """Enums for scraper choices."""
 
-from strenum import StrEnum
+from enum import StrEnum
 
 
 class CleanupType(StrEnum):

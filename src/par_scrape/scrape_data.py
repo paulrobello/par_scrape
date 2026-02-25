@@ -1,7 +1,6 @@
 """Scrape data from Web."""
 
 import json
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -31,7 +30,7 @@ def save_raw_data(raw_data: str, output_base: Path) -> Path:
     else:
         # For non-directory paths, just append -raw
         raw_output_path = Path(str(output_base) + "-raw.md")
-    raw_output_path.write_text(raw_data)
+    raw_output_path.write_text(raw_data, encoding="utf-8")
     console_out.print(Panel(f"Raw data saved to [bold green]{raw_output_path}[/bold green]"))
     return raw_output_path
 
@@ -119,10 +118,10 @@ def format_data(
         if prompt_cache and isinstance(chat_model, ChatAnthropic):
             history[1][1][0]["cache_control"] = {"type": "ephemeral"}  # type: ignore
 
-        data = structure_model.invoke(history, config=llm_run_manager.get_runnable_config(chat_model.name))  # type: ignore
-        if isinstance(data, BaseModel):
-            return data
-        console_out.print(data)
+        result = structure_model.invoke(history, config=llm_run_manager.get_runnable_config(chat_model.name))  # type: ignore
+        if isinstance(result, BaseModel):
+            return result
+        console_out.print(result)
         raise ValueError("Error in API call. Did not return a Pydantic BaseModel")
     except Exception as e:  # pylint: disable=broad-exception-caught
         console_out.print(f"[bold red]Error in API call or parsing response:[/bold red] {str(e)}")
@@ -150,7 +149,7 @@ def save_formatted_data(
     """
     file_paths: dict[OutputFormat, Path] = {}
     # Ensure the output folder exists
-    os.makedirs(output_folder, exist_ok=True)
+    output_folder.mkdir(parents=True, exist_ok=True)
 
     # Prepare Extracted data as a dictionary
     formatted_data_dict = formatted_data.model_dump()

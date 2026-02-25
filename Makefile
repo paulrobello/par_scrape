@@ -57,6 +57,13 @@ shell:			# Start shell inside of .venv
 format:                         # Reformat the code with ruff.
 	$(ruff) format src/$(lib)
 
+.PHONY: fmt
+fmt: format                     # Alias for format (standard convention)
+
+.PHONY: test
+test:                           # Run tests with pytest
+	$(run) pytest
+
 .PHONY: lint
 lint:                           # Run ruff over the library
 	$(ruff) check src/$(lib) --fix
@@ -70,7 +77,7 @@ typecheck-stats:			# Perform static type checks with pyright and print stats
 	$(pyright) --stats
 
 .PHONY: checkall
-checkall: format lint typecheck 	        # Check all the things
+checkall: format lint typecheck test	# Check all the things
 
 .PHONY: pre-commit              # run pre-commit checks on all files
 pre-commit:

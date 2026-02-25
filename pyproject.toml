@@ -59,7 +59,6 @@ dependencies = [
     "par-ai-core>=0.4.3",
     "fastapi>=0.121.2",
     "tldextract>=5.3.0",
-    "strenum>=0.4.15",
 ]
 packages = [
     "src/par_scrape",

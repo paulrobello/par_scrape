@@ -3,13 +3,15 @@
 import sqlite3
 import threading
 import time
+import urllib.request
 import urllib.robotparser
 from collections.abc import Iterable
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
+from par_ai_core.par_logging import console_out
 from par_ai_core.web_tools import normalize_url
 from rich.console import Console
 
@@ -102,7 +104,7 @@ EXCLUDED_URL_PATTERNS = {
 DEFAULT_USER_AGENT = "par-scrape/1.0 (+https://github.com/paulrobello/par_scrape)"
 
 
-class CrawlType(str, Enum):
+class CrawlType(StrEnum):
     """Types of web crawling strategies."""
 
     SINGLE_PAGE = "single_page"
@@ -111,7 +113,7 @@ class CrawlType(str, Enum):
     # PAGINATED = "paginated"
 
 
-class PageStatus(str, Enum):
+class PageStatus(StrEnum):
     """Status flags for pages in the crawl queue."""
 
     QUEUED = "queued"
@@ -120,7 +122,7 @@ class PageStatus(str, Enum):
     ERROR = "error"
 
 
-class ErrorType(str, Enum):
+class ErrorType(StrEnum):
     """Types of errors that can occur during crawling."""
 
     NETWORK = "network"
@@ -218,7 +220,8 @@ def check_robots_txt(url: str, user_agent: str = DEFAULT_USER_AGENT) -> bool:
                 robots_url = f"{parsed_url.scheme}://{domain}/robots.txt"
                 rp.set_url(robots_url)
                 try:
-                    rp.read()
+                    with urllib.request.urlopen(robots_url, timeout=10) as response:
+                        rp.parse(line.decode("utf-8", errors="replace") for line in response)
                     ROBOTS_PARSERS[domain] = rp
                 except Exception:
                     # If we can't read robots.txt, assume everything is allowed
@@ -375,13 +378,12 @@ def init_db() -> None:
                 cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='db_version'")
                 if not cursor.fetchone():
                     # No version table, remove the incompatible database
-                    conn.close()
                     DB_PATH.unlink()
-                    print(f"Removed incompatible database at {DB_PATH}")
+                    console_out.print(f"[yellow]Removed incompatible database at {DB_PATH}[/yellow]")
         except sqlite3.Error:
             # If any error occurs, assume the database is corrupted or incompatible
             DB_PATH.unlink()
-            print(f"Removed corrupted database at {DB_PATH}")
+            console_out.print(f"[yellow]Removed corrupted database at {DB_PATH}[/yellow]")
 
     with sqlite3.connect(DB_PATH) as conn:
         # Enable foreign keys
