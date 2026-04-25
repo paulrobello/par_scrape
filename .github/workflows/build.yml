@@ -1,11 +1,7 @@
 name: Build and Test 🐍 distribution 📦
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
   build:
