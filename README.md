@@ -254,6 +254,9 @@ par_scrape --url "https://openai.com/api/pricing/" -O md --crawl-batch-size 5 --
 
 
 ## Whats New
+- Version 0.9.2
+  - Updated all dependencies to latest versions
+  - Added `gitleaks` pre-commit hook for secret detection
 - Version 0.9.1
   - **Bug fix**: `--output-folder` argument was silently ignored; output always went to `./output`
   - **Bug fix**: `--display-output` never showed content due to wrong internal dict key lookup
