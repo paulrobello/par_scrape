@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from unittest import mock
 
@@ -137,7 +138,7 @@ class TestCrawlFunctions:
             crawl.init_db()
             crawl.set_crawl_delay(domain, delay)
 
-            with sqlite3.connect(test_db) as conn:
+            with closing(sqlite3.connect(test_db)) as conn, conn:
                 row = conn.execute("SELECT crawl_delay FROM domain_rate_limit WHERE domain = ?", (domain,)).fetchone()
                 assert row is not None
                 assert row[0] == delay
@@ -165,7 +166,7 @@ class TestQueueFunctions:
         with mock.patch.object(crawl, "DB_PATH", test_db):
             crawl.init_db()
             crawl.add_to_queue(ticket_id, queue)
-            with sqlite3.connect(test_db) as conn:
+            with closing(sqlite3.connect(test_db)) as conn, conn:
                 for url in completed:
                     conn.execute("UPDATE scrape SET status = ? WHERE ticket_id = ? AND url = ?", (PageStatus.COMPLETED.value, ticket_id, url))
                 conn.commit()
@@ -187,8 +188,7 @@ class TestQueueFunctions:
 
         crawl.add_to_queue(ticket_id, urls)
 
-        from sqlite3 import connect
-        with connect(db_path) as connection:
+        with closing(sqlite3.connect(db_path)) as connection, connection:
             row = connection.execute("SELECT COUNT(*) FROM scrape WHERE ticket_id = ?", (ticket_id,)).fetchone()
             assert row[0] == expected_count
 
@@ -204,7 +204,7 @@ class TestMarkFunctions:
 
             crawl.mark_complete(ticket_id, url, raw_file_path=raw_file_path, file_paths=file_paths)
 
-            with sqlite3.connect(test_db) as conn:
+            with closing(sqlite3.connect(test_db)) as conn, conn:
                 row = conn.execute("SELECT status FROM scrape WHERE ticket_id = ? AND url = ?", (ticket_id, url)).fetchone()
                 assert row is not None
                 assert row[0] == PageStatus.COMPLETED.value
@@ -220,7 +220,7 @@ class TestMarkFunctions:
 
             crawl.mark_error(ticket_id, url, error_msg=error_msg, error_type=error_type)
 
-            with sqlite3.connect(test_db) as conn:
+            with closing(sqlite3.connect(test_db)) as conn, conn:
                 row = conn.execute("SELECT status, error_msg, error_type FROM scrape WHERE ticket_id = ? AND url = ?", (ticket_id, url)).fetchone()
                 assert row is not None
                 assert row[0] == PageStatus.ERROR.value
@@ -231,7 +231,7 @@ class TestMarkFunctions:
         with mock.patch.object(crawl, "DB_PATH", test_db):
             crawl.init_db()
             crawl.mark_complete("TicketX", "http://nonexistent.com", raw_file_path=tmp_path / "raw.html", file_paths={})
-            with sqlite3.connect(test_db) as conn:
+            with closing(sqlite3.connect(test_db)) as conn, conn:
                 row = conn.execute("SELECT status FROM scrape WHERE ticket_id = ? AND url = ?", ("TicketX", "http://nonexistent.com")).fetchone()
                 assert row is None
 
@@ -239,7 +239,7 @@ class TestMarkFunctions:
         with mock.patch.object(crawl, "DB_PATH", test_db):
             crawl.init_db()
             crawl.mark_error("TicketX", "http://nonexistent.com", error_msg="Error", error_type=crawl.ErrorType.OTHER)
-            with sqlite3.connect(test_db) as conn:
+            with closing(sqlite3.connect(test_db)) as conn, conn:
                 row = conn.execute("SELECT status FROM scrape WHERE ticket_id = ? AND url = ?", ("TicketX", "http://nonexistent.com")).fetchone()
                 assert row is None
 
@@ -253,7 +253,7 @@ def test_init_db(tmp_path):
         crawl.init_db()
         assert test_db.exists()
 
-        with sqlite3.connect(test_db) as conn:
+        with closing(sqlite3.connect(test_db)) as conn, conn:
             cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in cursor.fetchall()]
             assert "scrape" in tables

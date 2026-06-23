@@ -4,7 +4,7 @@ import os
 import shutil
 import sqlite3
 import time
-from contextlib import nullcontext
+from contextlib import closing, nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
@@ -503,7 +503,7 @@ def main(
 
                                         # Calculate the current page depth
                                         current_depth = 0
-                                        with sqlite3.connect(DB_PATH) as conn:
+                                        with closing(sqlite3.connect(DB_PATH)) as conn, conn:
                                             row = conn.execute(
                                                 "SELECT depth FROM scrape WHERE ticket_id = ? AND url = ?",
                                                 (run_name, current_url),
@@ -619,7 +619,7 @@ def main(
                                     if error_type == ErrorType.NETWORK or error_type == ErrorType.TIMEOUT:
                                         domain = urlparse(current_url).netloc
                                         current_delay = 1
-                                        with sqlite3.connect(DB_PATH) as conn:
+                                        with closing(sqlite3.connect(DB_PATH)) as conn, conn:
                                             row = conn.execute(
                                                 "SELECT crawl_delay FROM domain_rate_limit WHERE domain = ?", (domain,)
                                             ).fetchone()

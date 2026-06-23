@@ -6,6 +6,7 @@ import time
 import urllib.request
 import urllib.robotparser
 from collections.abc import Iterable
+from contextlib import closing
 from enum import StrEnum
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -373,7 +374,7 @@ def init_db() -> None:
     # Check if database exists and if it has our version table
     if DB_PATH.exists():
         try:
-            with sqlite3.connect(DB_PATH) as conn:
+            with closing(sqlite3.connect(DB_PATH)) as conn, conn:
                 # Check if db_version table exists
                 cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='db_version'")
                 if not cursor.fetchone():
@@ -385,7 +386,7 @@ def init_db() -> None:
             DB_PATH.unlink()
             console_out.print(f"[yellow]Removed corrupted database at {DB_PATH}[/yellow]")
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
         # Enable foreign keys
         conn.execute("PRAGMA foreign_keys = ON")
 
@@ -468,7 +469,7 @@ def get_queue_stats(ticket_id: str) -> dict[str, int]:
     Returns:
         dict: Dictionary with counts of items in each status
     """
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
         stats = {}
         for status in PageStatus:
             row = conn.execute(
@@ -492,7 +493,7 @@ def get_queue_size(ticket_id: str) -> int:
     Returns:
         int: Number of URLs in queued status
     """
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
         row = conn.execute(
             """
             SELECT COUNT(*) FROM scrape
@@ -517,7 +518,7 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0) -> None:
         URLs already in error state will have their status reset to QUEUED.
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
         # Use BEGIN IMMEDIATE for better concurrency control
         conn.execute("BEGIN IMMEDIATE")
         try:
@@ -588,7 +589,7 @@ def get_next_urls(
     urls = []
     domains_used = set()
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
         # Use BEGIN IMMEDIATE to acquire a write lock immediately and prevent race conditions
         conn.execute("BEGIN IMMEDIATE")
         try:
@@ -676,7 +677,7 @@ def set_crawl_delay(domain: str, delay_seconds: int) -> None:
         domain: Domain to set rate limit for
         delay_seconds: Minimum seconds between requests to this domain
     """
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
         conn.execute(
             """
             INSERT OR REPLACE INTO domain_rate_limit (domain, last_access, crawl_delay)
@@ -699,7 +700,7 @@ def mark_complete(
         file_paths: Dictionary mapping output formats to file paths
         cost: Cost of processing this URL (if applicable)
     """
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
         conn.execute(
             """
             UPDATE scrape
@@ -735,7 +736,7 @@ def mark_error(
         error_type: Type of error that occurred
         cost: Cost of processing this URL (if applicable)
     """
-    with sqlite3.connect(DB_PATH) as conn:
+    with closing(sqlite3.connect(DB_PATH)) as conn, conn:
         conn.execute(
             """
             UPDATE scrape
