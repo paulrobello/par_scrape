@@ -78,3 +78,4 @@ __pypackages__/
 **/.DS_Store
 PR_*.md
 *~
+.claude/statusline-*
