@@ -3,8 +3,7 @@ name = "par_scrape"
 dynamic = [
     "version",
 ]
-description = "A versatile web scraping tool with options for Selenium or Playwright, featuring OpenAI-powered data extraction and formatting."
-url = "https://github.com/paulrobello/par_scrape"
+description = "A versatile web scraping tool with options for Selenium or Playwright, featuring AI-powered data extraction and formatting."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
@@ -57,11 +56,6 @@ dependencies = [
     "openpyxl>=3.1.5",
     "tabulate>=0.10.0",
     "par-ai-core[all]>=0.5.9",
-    "fastapi>=0.139.0",
-    "tldextract>=5.3.1",
-]
-packages = [
-    "src/par_scrape",
 ]
 
 [project.license]
@@ -131,7 +125,13 @@ exclude = [
 ]
 
 [tool.pyright]
-pythonVersion = "3.14"
+include = ["src/**/*.py"]
+exclude = ["**/node_modules", "**/__pycache__", "**/output"]
+ignore = ["**/.venv"]
+defineConstant = { DEBUG = true }
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.11"
 pythonPlatform = "All"
 typeCheckingMode = "standard"
 useLibraryCodeForTypes = true

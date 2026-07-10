@@ -54,14 +54,6 @@ Custom exception hierarchy:
 - `ProviderConfigError` — invalid AI provider or model configuration
 - `InvalidURLError`, `ScrapeError`, `RobotError` — crawl-specific errors
 
-### `src/par_scrape/utils.py`
-
-Helper functions:
-
-- `chunk_list` — splits a list into evenly sized chunks
-- `safe_divide` — divides two numbers, returning 0.0 on division by zero
-- `merge_dicts` — merges two dicts, with the second overwriting keys from the first
-
 ### `src/par_scrape/scrape_data.py`
 
 Data formatting and persistence:
@@ -76,25 +68,47 @@ Data formatting and persistence:
 
 Crawl queue and helpers:
 
-- `is_valid_url`, `clean_url_of_ticket_id`, `should_exclude_url`
+- `is_valid_url`, `should_exclude_url`
 - `check_robots_txt` — checks `robots.txt` with a 10-second fetch timeout
 - `extract_links` — extracts and filters links from HTML
 - `get_url_output_folder` — maps a URL to a local output path
-- `init_db`, `add_to_queue`, `get_next_urls`, `get_queue_size`, `get_queue_stats`
+- `init_db`, `add_to_queue`, `get_next_urls`, `get_queue_stats`
 - `mark_complete`, `mark_error`, `set_crawl_delay`
 
 ## 5. Test Files
 
+The suite lives entirely under `tests/`. The files, in order of layer from lowest to highest:
+
+### `tests/conftest.py`
+
+Shared pytest fixtures. Defines the canonical `db_path` fixture (established in ARC-011): it yields a `tmp_path`-backed SQLite database, initializes the schema on it via explicit `db_path=` injection, and also points `queue_db.DB_PATH` at the same file for code that still reads the module global. Every queue test depends on this fixture for isolation.
+
+### `tests/test_enums.py`
+
+Covers the `enums.py` value types: `CleanupType`, `OutputFormat` members and values, enum uniqueness, and iterability. Pure data tests with no I/O.
+
+### `tests/test_exceptions.py`
+
+Covers the typed exception hierarchy in `exceptions.py`: the `classify_error` router (isinstance routing, substring fallback, and isinstance-takes-precedence rule) and that `ScrapeError` is a subclass of the `ParScrapeError` base.
+
 ### `tests/test_crawl.py`
 
-Covers core crawling helpers and queue logic using `pytest.mark.parametrize` and fixtures.
-Uses `monkeypatch` and `mock.patch.object` to isolate the SQLite database path.
+The largest test file; covers the persistence and URL-filtering layers reached through the `crawl.py` compatibility shim. Class-grouped, heavily parametrized:
 
-Edge cases include: invalid URLs, URLs with ticket IDs, empty queues, missing URLs in `mark_complete`/`mark_error`, excluded asset types.
+- `TestCrawlFunctions` — `is_valid_url`, `check_robots_txt` (including fail-open on fetch error), `get_next_urls` rate-limit selection, `extract_links`, `should_exclude_url` (with segment-anchoring edge cases), `get_url_output_folder` (including traversal-netloc rejection), `set_crawl_delay`.
+- `TestQueueFunctions` — `get_queue_stats`, `add_to_queue` (including the run-name-in-URL edge case).
+- `TestMarkFunctions` — `mark_complete` / `mark_error`, including the missing-URL no-op cases.
+- `TestFilePathsJsonColumn` — the v2 schema `file_paths` JSON column written by `mark_complete`.
+- `TestQueueHelpers` — `get_url_depth` and `increase_crawl_delay` (double-and-cap).
+- Module-level `test_init_db*` — schema initialization and the incompatible-database rename-aside upgrade path.
 
-### `tests/test_utils.py` *(if present)*
+### `tests/test_scrape_data.py`
 
-Covers `chunk_list`, `safe_divide`, and `merge_dicts` with valid, edge-case, and error inputs.
+Covers `scrape_data.py`: `save_raw_data` (directory vs. non-directory base), `create_dynamic_model` / `create_container_model`, `format_data` success and failure (LLM mocked; asserts `ScrapeError` on failure per ARC-001), and `save_formatted_data` across formats including the CSV formula-injection neutralizer, the empty-DataFrame `ScrapeError`, and per-format write failures (ARC-001 raise-on-failure contract).
+
+### `tests/test_runner.py`
+
+Covers the `runner.py` orchestration layer extracted in ARC-002: `process_url` for the markdown-only path (marks `COMPLETED` and writes the file) and the HTML-to-markdown timeout path (classifies the error and marks `ERROR`), plus a CLI markdown-only smoke test through `main()`. Uses `mocker` plus the shared `db_path` fixture.
 
 ## 6. Custom Exceptions
 
@@ -115,7 +129,6 @@ Defined in `src/par_scrape/exceptions.py`:
 |---|---|---|
 | `src/par_scrape/exceptions.py` | 100% | All custom exceptions covered |
 | `src/par_scrape/enums.py` | 100% | Enum members and values covered |
-| `src/par_scrape/utils.py` | 100% | All helpers with valid and edge-case inputs |
 | `src/par_scrape/crawl.py` | ~77% | Core helpers and queue logic; full crawl orchestration not covered |
 | `src/par_scrape/scrape_data.py` | ~73% | LLM calls mocked; file I/O and model creation covered |
 | `src/par_scrape/__main__.py` | 0% | CLI orchestration not yet tested |

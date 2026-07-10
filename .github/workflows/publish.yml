@@ -70,9 +70,11 @@ jobs:
       - name: Discord notification
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@master
-        with:
-          args: 'The project {{ EVENT_PAYLOAD.repository.full_name }} ${{ env.VERSION }} has been published to PyPI.'
+          REPO: ${{ github.repository }}
+          VERSION: ${{ env.VERSION }}
+        run: |
+          payload=$(jq -n --arg content "The project $REPO $VERSION has been published to PyPI." '{content: $content}')
+          curl -sf -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
         continue-on-error: true
 
       - name: Cleanup on failure

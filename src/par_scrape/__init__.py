@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 __author__ = "Paul Robello"
 __copyright__ = "Copyright 2025, Paul Robello"
 __credits__ = ["Paul Robello"]
@@ -13,8 +11,6 @@ __version__ = "0.9.3"
 __licence__ = "MIT"
 __application_title__ = "PAR Scrape"
 __application_binary__ = "par_scrape"
-
-os.environ["USER_AGENT"] = f"{__application_title__} {__version__}"
 
 __all__: list[str] = [
     "__author__",

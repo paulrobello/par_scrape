@@ -55,7 +55,7 @@ shell:			# Start shell inside of .venv
 # Checking/testing/linting/etc.
 .PHONY: format
 format:                         # Reformat the code with ruff.
-	$(ruff) format src/$(lib)
+	$(ruff) format src/$(lib) tests
 
 .PHONY: fmt
 fmt: format                     # Alias for format (standard convention)
@@ -65,8 +65,12 @@ test:                           # Run tests with pytest
 	$(run) pytest
 
 .PHONY: lint
-lint:                           # Run ruff over the library
-	$(ruff) check src/$(lib) --fix
+lint:                           # Check code with ruff (non-mutating)
+	$(ruff) check src/$(lib) tests
+
+.PHONY: lint-fix
+lint-fix:                       # Run ruff and auto-fix findings
+	$(ruff) check src/$(lib) tests --fix
 
 .PHONY: typecheck
 typecheck:			# Perform static type checks with pyright
@@ -89,6 +93,9 @@ pre-commit-update:
 
 ##############################################################################
 # Package/publish.
+.PHONY: build
+build: package			# Standard alias for package
+
 .PHONY: package
 package: clean			# Package the library
 	$(build)

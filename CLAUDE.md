@@ -6,7 +6,7 @@
 - Run format, lint, typecheck: `make checkall`
 
 ## Code Style
-- Python version: 3.10+
+- Python version: 3.11+
 - Line length: 120 characters
 - Indentation: 4 spaces
 - Type annotations required (use `list`, `dict`, `tuple` over `List`, `Dict`, `Tuple`)

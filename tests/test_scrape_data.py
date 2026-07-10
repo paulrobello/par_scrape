@@ -6,6 +6,7 @@ import pytest
 from pydantic import BaseModel
 
 from par_scrape.enums import OutputFormat
+from par_scrape.exceptions import ScrapeError
 from par_scrape.scrape_data import (
     create_container_model,
     create_dynamic_model,
@@ -32,7 +33,7 @@ def test_save_raw_data_creates_file_and_logs(tmp_path, mocker, as_dir):
     result_path = save_raw_data("hello world", output_base)
 
     assert result_path == expected_path
-    assert result_path.read_text(encoding='utf-8') == "hello world"
+    assert result_path.read_text(encoding="utf-8") == "hello world"
     mock_print.assert_called_once()
 
 
@@ -95,7 +96,7 @@ def test_format_data_success(tmp_path, mocker):
     assert result is empty_container
 
 
-def test_format_data_failure_returns_empty_container(tmp_path, mocker):
+def test_format_data_failure_raises_scrape_error(tmp_path, mocker):
     prompt_path = tmp_path / "prompt.md"
     prompt_path.write_text("system prompt", encoding="utf-8")
 
@@ -111,18 +112,17 @@ def test_format_data_failure_returns_empty_container(tmp_path, mocker):
 
     mock_print = mocker.patch("par_scrape.scrape_data.console_out.print")
 
-    result = format_data(
-        data="some text",
-        dynamic_listings_container=ContainerModel,
-        llm_config=mock_llm_config,
-        prompt_cache=False,
-        extraction_prompt=prompt_path,
-    )
+    # ARC-001: an LLM/parsing failure must propagate, not be swallowed as an
+    # empty container (which previously recorded the page as COMPLETED).
+    with pytest.raises(ScrapeError, match="LLM extraction failed"):
+        format_data(
+            data="some text",
+            dynamic_listings_container=ContainerModel,
+            llm_config=mock_llm_config,
+            prompt_cache=False,
+            extraction_prompt=prompt_path,
+        )
 
-    # On error, it should return an empty container
-    assert isinstance(result, BaseModel)
-    assert hasattr(result, "listings")
-    assert result.listings == []
     mock_print.assert_called()  # error was logged
 
 
@@ -148,9 +148,7 @@ class ListingContainer(BaseModel):
 def test_save_formatted_data_creates_files(tmp_path, mocker, formats):
     mock_print = mocker.patch("par_scrape.scrape_data.console_out.print")
 
-    data = ListingContainer(
-        listings=[Listing(title="Item 1", price="$10"), Listing(title="Item 2", price="$20")]
-    )
+    data = ListingContainer(listings=[Listing(title="Item 1", price="$10"), Listing(title="Item 2", price="$20")])
 
     df, paths = save_formatted_data(
         formatted_data=data,
@@ -202,6 +200,75 @@ def test_save_formatted_data_invalid_model(tmp_path):
         save_formatted_data(
             formatted_data=weird,
             output_formats=[OutputFormat.JSON],
+            run_name="run1",
+            output_folder=tmp_path,
+        )
+
+
+def test_save_formatted_data_neutralizes_csv_formula_injection(tmp_path, mocker):
+    """SEC-003: spreadsheet formula-injection neutralization on CSV export."""
+    mocker.patch("par_scrape.scrape_data.console_out.print")
+
+    payload = "=CMD|'/C calc'!A0"
+    data = ListingContainer(listings=[Listing(title="row1", price=payload)])
+
+    df, paths = save_formatted_data(
+        formatted_data=data,
+        output_formats=[OutputFormat.CSV],
+        run_name="run1",
+        output_folder=tmp_path,
+    )
+
+    assert isinstance(df, pd.DataFrame)
+    csv_path = paths[OutputFormat.CSV]
+    read_back = pd.read_csv(csv_path)
+    cell_value = str(read_back.iloc[0]["price"])
+    assert cell_value.startswith("'="), f"formula payload was not neutralized: {cell_value!r}"
+
+
+def test_save_formatted_data_empty_raises_scrape_error(tmp_path, mocker):
+    """ARC-001: an empty result set is a page failure, not a silent COMPLETED.
+
+    Previously the outer handler returned ``(None, {})``, hiding the failure
+    and letting the caller record the page as COMPLETED.
+    """
+    mocker.patch("par_scrape.scrape_data.console_out.print")
+
+    data = ListingContainer(listings=[])
+
+    with pytest.raises(ScrapeError, match="Failed to save extracted data"):
+        save_formatted_data(
+            formatted_data=data,
+            output_formats=[OutputFormat.CSV],
+            run_name="run1",
+            output_folder=tmp_path,
+        )
+
+
+@pytest.mark.parametrize(
+    "fmt, target, exc",
+    [
+        pytest.param(OutputFormat.EXCEL, "to_excel", OSError("disk full"), id="excel_oserror"),
+        pytest.param(OutputFormat.CSV, "to_csv", OSError("read-only"), id="csv_oserror"),
+        pytest.param(OutputFormat.MARKDOWN, "to_markdown", ValueError("bad table"), id="markdown_valueerror"),
+    ],
+)
+def test_save_formatted_data_format_failure_raises_scrape_error(tmp_path, mocker, fmt, target, exc):
+    """QA-010: a failed per-format write is a page failure, not a silent skip.
+
+    Contract change (intended): a user-requested output that cannot be written
+    now propagates as ``ScrapeError`` so the runner routes the page to
+    ``mark_error`` instead of recording partial success.
+    """
+    mocker.patch("par_scrape.scrape_data.console_out.print")
+    mocker.patch(f"pandas.DataFrame.{target}", side_effect=exc)
+
+    data = ListingContainer(listings=[Listing(title="row1", price="$10")])
+
+    with pytest.raises(ScrapeError, match="Failed to save"):
+        save_formatted_data(
+            formatted_data=data,
+            output_formats=[fmt],
             run_name="run1",
             output_folder=tmp_path,
         )

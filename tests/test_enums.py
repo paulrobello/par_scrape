@@ -1,4 +1,5 @@
 import pytest
+
 from par_scrape.enums import CleanupType, OutputFormat
 
 
@@ -15,12 +16,15 @@ def test_cleanup_type_members_and_values():
         assert CleanupType[name].value == value
 
 
-@pytest.mark.parametrize("name,value", [
-    ("MARKDOWN", "md"),
-    ("JSON", "json"),
-    ("CSV", "csv"),
-    ("EXCEL", "excel"),
-])
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("MARKDOWN", "md"),
+        ("JSON", "json"),
+        ("CSV", "csv"),
+        ("EXCEL", "excel"),
+    ],
+)
 def test_output_format_members_and_values(name, value):
     """Ensure OutputFormat members match expected names and values."""
     member = OutputFormat[name]

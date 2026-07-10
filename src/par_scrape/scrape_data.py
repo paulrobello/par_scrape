@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, create_model
 from rich.panel import Panel
 
 from par_scrape.enums import OutputFormat
+from par_scrape.exceptions import ScrapeError
 
 
 def save_raw_data(raw_data: str, output_base: Path) -> Path:
@@ -19,7 +20,9 @@ def save_raw_data(raw_data: str, output_base: Path) -> Path:
 
     Args:
         raw_data (str): The raw data to save.
-        output_base (str): The folder or base file_name to save the file in. Defaults to 'output'.
+        output_base (Path): The folder, or base file path, to save the file
+            in. A directory is written to as ``raw_data.md``; a non-directory
+            path is suffixed with ``-raw.md``.
 
     Returns:
         Path: The path to the saved file.
@@ -69,7 +72,6 @@ def create_container_model(dynamic_model: type[BaseModel]) -> type[BaseModel]:
     return create_model("DynamicListingsContainer", listings=(list[dynamic_model], ...))
 
 
-# pylint: disable=too-many-positional-arguments
 def format_data(
     *,
     data: str,
@@ -86,10 +88,16 @@ def format_data(
         dynamic_listings_container (Type[BaseModel]): The Pydantic model to use for parsing.
         llm_config (LlmConfig): The configuration for the AI provider.
         prompt_cache (bool): Whether to use prompt caching.
-        extraction_prompt (Path): Path to the extraction prompt file.
+        extraction_prompt (Path | None): Path to the extraction prompt file.
+            When ``None``, the bundled ``extraction_prompt.md`` is used.
 
     Returns:
         BaseModel: The Extracted data as a Pydantic model instance.
+
+    Raises:
+        ScrapeError: If the LLM call or response parsing fails.
+        FileNotFoundError: If ``extraction_prompt`` (or the bundled default)
+            does not exist.
     """
     if not extraction_prompt:
         extraction_prompt = Path(__file__).parent / "extraction_prompt.md"
@@ -123,9 +131,18 @@ def format_data(
             return result
         console_out.print(result)
         raise ValueError("Error in API call. Did not return a Pydantic BaseModel")
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except Exception as e:
         console_out.print(f"[bold red]Error in API call or parsing response:[/bold red] {str(e)}")
-        return dynamic_listings_container(listings=[])
+        raise ScrapeError(f"LLM extraction failed: {e}") from e
+
+
+def _neutralize_spreadsheet_formulas(df: pd.DataFrame) -> pd.DataFrame:
+    """Prefix cells that spreadsheet apps would execute as formulas (CWE-1236).
+
+    Cells beginning with =, +, -, @, tab, or CR are prefixed with a single quote,
+    which Excel/LibreOffice treat as a literal-text marker.
+    """
+    return df.map(lambda v: "'" + v if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r") else v)
 
 
 def save_formatted_data(
@@ -144,8 +161,12 @@ def save_formatted_data(
         output_folder (Path): The folder to save the files in.
 
     Returns:
-        Tuple[pd.DataFrame | None, Dict[OutputFormat, Path]]: The DataFrame created from the Extracted data and a dictionary of
-        file paths, or None and an empty dict if an error occurred.
+        Tuple[pd.DataFrame, Dict[OutputFormat, Path]]: The DataFrame created from the Extracted data and a dictionary of
+        file paths.
+
+    Raises:
+        ScrapeError: If the DataFrame cannot be built or any output file cannot be written.
+        ValueError: If the Extracted data is neither a dict nor a list.
     """
     file_paths: dict[OutputFormat, Path] = {}
     # Ensure the output folder exists
@@ -179,27 +200,29 @@ def save_formatted_data(
         if df.empty:
             raise ValueError("DataFrame is empty, cannot save to files")
 
+        safe_df = _neutralize_spreadsheet_formulas(df)
+
         if OutputFormat.EXCEL in output_formats:
             try:
                 # Don't include run_name in filename since it's already in the path
                 excel_output_path = output_folder / "extracted_data.xlsx"
-                df.to_excel(excel_output_path, index=False)
+                safe_df.to_excel(excel_output_path, index=False)
                 console_out.print(Panel(f"Excel data saved to [bold green]{excel_output_path}[/bold green]"))
                 file_paths[OutputFormat.EXCEL] = excel_output_path
-            except Exception as e:
-                console_out.print("[bold red]Error: Saving Excel failed[/bold red]")
-                console_out.print(e)
+            except (OSError, ValueError) as e:
+                # QA-010: a user-requested output that cannot be written is a page
+                # failure (must reach mark_error), not a silent skip.
+                raise ScrapeError(f"Failed to save Excel output: {e}") from e
 
         if OutputFormat.CSV in output_formats:
             try:
                 # Don't include run_name in filename since it's already in the path
                 csv_output_path = output_folder / "extracted_data.csv"
-                df.to_csv(csv_output_path, index=False)
+                safe_df.to_csv(csv_output_path, index=False)
                 console_out.print(Panel(f"CSV data saved to [bold green]{csv_output_path}[/bold green]"))
                 file_paths[OutputFormat.CSV] = csv_output_path
-            except Exception as e:
-                console_out.print("[bold red]Error: Saving CSV failed[/bold red]")
-                console_out.print(e)
+            except (OSError, ValueError) as e:
+                raise ScrapeError(f"Failed to save CSV output: {e}") from e
 
         if OutputFormat.MARKDOWN in output_formats:
             try:
@@ -208,10 +231,9 @@ def save_formatted_data(
                 markdown_output_path.write_text(df.to_markdown(index=False) or "", encoding="utf-8")
                 console_out.print(Panel(f"Markdown table saved to [bold green]{markdown_output_path}[/bold green]"))
                 file_paths[OutputFormat.MARKDOWN] = markdown_output_path
-            except Exception as e:
-                console_out.print("[bold red]Error: Saving Markdown table failed[/bold red]")
-                console_out.print(e)
+            except (OSError, ValueError) as e:
+                raise ScrapeError(f"Failed to save Markdown output: {e}") from e
         return df, file_paths
     except Exception as e:
         console_out.print(f"[bold red]Error creating DataFrame or saving files:[/bold red] {str(e)}")
-        return None, {}
+        raise ScrapeError(f"Failed to save extracted data: {e}") from e
