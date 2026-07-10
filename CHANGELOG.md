@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-07-10
+
 ### Changed (Breaking)
 - `--url` / `-u` is now a required option (previously defaulted to `https://openai.com/api/pricing/`). A bare `par_scrape` invocation no longer generates live traffic to a third-party site; pass `--url` explicitly. Existing scripts and README examples already pass `--url`/`-u` and are unaffected.
 - Implicit `.env` loading from the current working directory has been removed (it could redirect API traffic and exfiltrate provider keys via an untrusted directory). Use the new opt-in `--env-file PATH` option to load a project-local env file; `~/.par_scrape.env` and the `~/.par-scrape.env` migration are unchanged.

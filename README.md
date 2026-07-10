@@ -292,19 +292,19 @@ You *MUST* call the `DynamicListingsContainer` function with the extracted data.
 
 ## What's New
 
+- Version 0.10.0
+  - **⚠️ Breaking:** `--url` / `-u` is now **required**. A bare `par_scrape` invocation no longer defaults to a third-party URL; pass `--url` explicitly. (Existing scripts and examples already pass `--url`/`-u` and are unaffected.)
+  - **⚠️ Breaking:** An implicit `.env` file in the current working directory is no longer auto-loaded (an untrusted directory could otherwise redirect API traffic and exfiltrate provider keys). Use the new opt-in `--env-file PATH` option to load a project-local env file; `~/.par_scrape.env` and the `~/.par-scrape.env` migration are unchanged.
+  - **Critical fix:** failed LLM extractions are no longer silently recorded as `COMPLETED` — they now route to the retry/error path (`mark_error`) instead of losing data with a success exit code.
+  - Hardened release pipelines (removed a mutable third-party action from privileged jobs), CSV/Excel formula-injection neutralization, scoped `--cleanup`, and safer URL/host handling
+  - Decomposed `main()` into a testable `runner.py`; split `crawl.py` into `queue_db` / `links` / `robots` / `paths`; non-destructive database migration; test coverage rose from 51% to 80%
+  - See [CHANGELOG.md](CHANGELOG.md) for the full list
 - Version 0.9.3
   - Fixed an SQLite connection leak (`ResourceWarning: unclosed database`) by wrapping connections in `contextlib.closing()` across `crawl.py`, `__main__.py`, and tests
   - Updated all dependencies to latest versions
 - Version 0.9.2
   - Updated all dependencies to latest versions
   - Added `gitleaks` pre-commit hook for secret detection
-- Version 0.9.1
-  - **Bug fix**: `--output-folder` argument was silently ignored; output always went to `./output`
-  - **Bug fix**: `--display-output` never showed content due to wrong internal dict key lookup
-  - **Bug fix**: `robots.txt` fetch had no timeout; can no longer hang the crawl indefinitely
-  - Removed `strenum` third-party dependency (replaced with stdlib `enum.StrEnum`)
-  - `make checkall` now runs tests; added `make test` and `make fmt` targets
-  - Code quality and type annotation improvements throughout
 
 See [CHANGELOG.md](CHANGELOG.md) for the full history.
 
