@@ -53,11 +53,11 @@ dependencies = [
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
     "rich>=15.0.0",
-    "typer>=0.26.7",
+    "typer>=0.26.8",
     "openpyxl>=3.1.5",
     "tabulate>=0.10.0",
-    "par-ai-core>=0.5.8",
-    "fastapi>=0.138.0",
+    "par-ai-core[all]>=0.5.9",
+    "fastapi>=0.139.0",
     "tldextract>=5.3.1",
 ]
 packages = [
@@ -86,9 +86,9 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "build>=1.5.0",
-    "pyright>=1.1.410",
-    "ruff>=0.15.18",
+    "build>=1.5.1",
+    "pyright>=1.1.411",
+    "ruff>=0.15.21",
     "pre-commit>=4.6.0",
     "pytest>=9.1.1",
     "pytest-mock>=3.15.1",
