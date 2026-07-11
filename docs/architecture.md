@@ -90,6 +90,7 @@ Key behaviors:
 - A Next.js client-side crash page is detected from the raw HTML before Markdown conversion (`NEXTJS_CLIENT_ERROR_MARKER`) and routed as a `ScrapeError`.
 - The LLM is only invoked when an output format other than Markdown is requested. `format_data` sends the Markdown plus the generated Pydantic schema; the result is saved by `save_formatted_data`.
 - Any exception in the pipeline is caught by `process_url`, classified via `classify_error`, recorded with `mark_error`, and — for network/timeout errors — triggers an adaptive rate-limit backoff on the domain.
+- When `--scrape-max-parallel` (`-P`) is greater than 1, `process_url` for every URL in a batch runs inside a bounded `ThreadPoolExecutor`, so the LLM round-trips overlap across pages instead of running one at a time. The default of 1 keeps the original sequential behavior. Worker threads never touch the live status spinner (`status=None`); all console output is serialized through a module-level lock. Queue writes are safe under concurrency because each thread gets its own WAL-mode SQLite connection (`queue_db._get_connection`), and writers use `BEGIN IMMEDIATE` with a 5-second `busy_timeout`. Per-domain rate limiting is enforced per batch by `get_next_urls` (at most one URL per domain when `--respect-rate-limits` is on); with rate limits off, multiple pages of the same domain may be processed concurrently within a batch.
 
 ## Queue Lifecycle
 

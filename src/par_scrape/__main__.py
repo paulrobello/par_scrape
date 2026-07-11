@@ -85,7 +85,7 @@ def main(
     ] = 3,
     scrape_max_parallel: Annotated[
         int,
-        typer.Option("--scrape-max-parallel", "-P", help="Max parallel fetch requests"),
+        typer.Option("--scrape-max-parallel", "-P", help="Max parallel fetch and extraction workers"),
     ] = 1,
     wait_type: Annotated[
         ScraperWaitType,

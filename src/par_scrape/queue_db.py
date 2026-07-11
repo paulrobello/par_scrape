@@ -33,6 +33,36 @@ ERROR_MESSAGE_MAX_LEN = 255
 _local = threading.local()
 
 
+class _ConnCloser:
+    """Owns one SQLite connection and closes it on its owning thread at exit.
+
+    Stored as the value in the per-thread ``_local`` cache. When a thread exits
+    (notably an ENH-001 worker thread winding down with its pool), CPython
+    clears that thread's local dict, this wrapper is collected on the exiting
+    thread, and ``__del__`` closes the connection explicitly — on the thread
+    that opened it, so ``check_same_thread`` stays satisfied and no
+    ``ResourceWarning`` leaks from the worker. ``close`` is idempotent.
+    """
+
+    __slots__ = ("conn",)
+    conn: sqlite3.Connection | None
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self.conn = conn
+
+    def close(self) -> None:
+        conn = self.conn
+        if conn is not None:
+            self.conn = None
+            try:
+                conn.close()
+            except sqlite3.Error:
+                pass
+
+    def __del__(self) -> None:
+        self.close()
+
+
 def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     """Return a cached per-thread SQLite connection configured for WAL.
 
@@ -53,17 +83,18 @@ def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
         across calls and released by :func:`close_connections`.
     """
     path = Path(db_path) if db_path is not None else DB_PATH
-    cache: dict[str, sqlite3.Connection] = getattr(_local, "connections", None) or {}
+    cache: dict[str, _ConnCloser] = getattr(_local, "connections", None) or {}
     _local.connections = cache
     key = str(path.resolve())
-    conn = cache.get(key)
+    closer = cache.get(key)
+    conn = closer.conn if closer is not None else None
     if conn is None:
         conn = sqlite3.connect(path)
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
         # WAL may be unsupported on network filesystems; fall back silently.
         conn.execute("PRAGMA journal_mode=WAL")
-        cache[key] = conn
+        cache[key] = _ConnCloser(conn)
     return conn
 
 
@@ -72,14 +103,13 @@ def close_connections() -> None:
 
     Called from the runner's ``finally`` block on shutdown and from the test
     fixture teardown so cached connections do not leak as ``ResourceWarning``
-    (this project has history there; see commit ``7a1e003``).
+    (this project has history there; see commit ``7a1e003``). Connections held
+    by other threads (e.g. ENH-001 pool workers) are closed on their owning
+    thread at thread-exit via :class:`_ConnCloser`.
     """
-    cache: dict[str, sqlite3.Connection] = getattr(_local, "connections", None) or {}
-    for conn in cache.values():
-        try:
-            conn.close()
-        except sqlite3.Error:
-            pass
+    cache: dict[str, _ConnCloser] = getattr(_local, "connections", None) or {}
+    for closer in cache.values():
+        closer.close()
     cache.clear()
 
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Concurrent LLM extraction: with `--scrape-max-parallel` / `-P` greater than 1, each batch's per-URL pipeline (Markdown conversion, LLM extraction, file writes, queue updates) now runs in a bounded thread pool, so LLM round-trip latency overlaps across pages instead of serializing per URL. The default of 1 keeps the original sequential behavior. Raise `--crawl-batch-size` / `-B` to at least `-P` so the pool has multiple pages per batch to overlap. Queue writes are concurrency-safe via the per-thread WAL SQLite connections (ENH-004), and worker threads never touch the live status spinner (all console output is lock-serialized).
+- Worker-thread SQLite connections are now closed on their owning thread at pool teardown (new `queue_db._ConnCloser`), preventing `ResourceWarning: unclosed database` under concurrent extraction.
+
+### Changed
+- `--scrape-max-parallel` / `-P` help text now reads "Max parallel fetch and extraction workers" (was "Max parallel fetch requests"); it governs both fetch and extraction parallelism.
+
 ## [0.10.0] - 2026-07-10
 
 ### Changed (Breaking)

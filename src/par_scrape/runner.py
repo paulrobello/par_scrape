@@ -8,10 +8,13 @@ it can be tested in isolation.
 
 import os
 import shutil
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import typer
@@ -64,6 +67,21 @@ from par_scrape.scrape_data import (
 # avoids false positives on pages that merely contain the words "Application
 # error" and routes the failure through classify_error via ScrapeError.
 NEXTJS_CLIENT_ERROR_MARKER = "Application error: a client-side exception has occurred"
+
+# Serializes Rich console output across worker threads (ENH-001). Uncontended on
+# the workers==1 path, so default output ordering is byte-for-byte unchanged.
+_console_lock = threading.Lock()
+
+
+def _print_locked(*args: Any, **kwargs: Any) -> None:
+    """``console_out.print`` serialized under :data:`_console_lock`.
+
+    Worker threads in the concurrent extraction pool route every console write
+    through here so multi-line output never interleaves. The lock is also taken
+    on the single-worker path, but uncontended, so behavior is identical.
+    """
+    with _console_lock:
+        console_out.print(*args, **kwargs)
 
 
 @dataclass(frozen=True)
@@ -275,7 +293,7 @@ def process_url(
     config: ScrapeConfig,
     *,
     cb: ParAICallbackHandler,
-    status: Status,
+    status: Status | None,
     llm_needed: bool,
     llm_config: LlmConfig | None,
     dynamic_model_container: type[BaseModel] | None,
@@ -292,7 +310,8 @@ def process_url(
         raw_html: The fetched HTML for ``current_url``.
         config: The fully-resolved scrape configuration.
         cb: The active par-ai-core callback handler (for cost reporting).
-        status: The active Rich status spinner.
+        status: The active Rich status spinner, or ``None`` when running inside
+            the concurrent worker pool (workers must not touch the live spinner).
         llm_needed: Whether LLM extraction is enabled for this run.
         llm_config: The LLM configuration, or ``None`` when ``llm_needed`` is False.
         dynamic_model_container: The generated listings container class, or
@@ -300,12 +319,12 @@ def process_url(
     """
     run_name = config.run_name
     try:
-        console_out.print(f"[green]{escape(current_url)}")
+        _print_locked(f"[green]{escape(current_url)}")
 
         url_output_folder = get_url_output_folder(config.output_folder, run_name, current_url)
 
         # 2. Print for debugging
-        console_out.print(f"[blue]Output folder: {url_output_folder}[/blue]")
+        _print_locked(f"[blue]Output folder: {url_output_folder}[/blue]")
         # Create necessary directories
         if llm_needed:
             url_output_folder.mkdir(parents=True, exist_ok=True)
@@ -333,7 +352,7 @@ def process_url(
 
             # Add extracted links to queue with incremented depth
             if page_links:
-                console_out.print(f"[cyan]Found {len(page_links)} links on {current_url}")
+                _print_locked(f"[cyan]Found {len(page_links)} links on {current_url}")
                 add_to_queue(run_name, page_links, current_depth + 1)
         # Detect a Next.js client-side crash before markdown conversion can
         # mangle the marker; the full sentence avoids false positives that the
@@ -342,17 +361,20 @@ def process_url(
         if NEXTJS_CLIENT_ERROR_MARKER in raw_html:
             raise ScrapeError("Next.js client-side application error page detected")
 
-        status.update("[bold cyan]Converting HTML to Markdown...")
+        if status is not None:
+            status.update("[bold cyan]Converting HTML to Markdown...")
         markdown = html_to_markdown(raw_html, url=current_url, include_images=True)
         if not markdown:
             raise ValueError("Markdown data is empty")
 
         # Save raw data
-        status.update("[bold cyan]Saving raw data...")
+        if status is not None:
+            status.update("[bold cyan]Saving raw data...")
         raw_output_path = save_raw_data(markdown, url_output_folder)
 
         if llm_needed:
-            status.update("[bold cyan]Extracting data with LLM...")
+            if status is not None:
+                status.update("[bold cyan]Extracting data with LLM...")
             if dynamic_model_container is None or llm_config is None:
                 raise RuntimeError("LLM configuration is required but was not initialized")
             formatted_data = format_data(
@@ -366,7 +388,8 @@ def process_url(
                 raise ValueError("No data was found by the LLM.")
 
             # Save formatted data
-            status.update("[bold cyan]Saving extracted data...")
+            if status is not None:
+                status.update("[bold cyan]Saving extracted data...")
             _, file_paths = save_formatted_data(
                 formatted_data=formatted_data,
                 run_name=run_name,
@@ -387,23 +410,25 @@ def process_url(
 
         # Display output if requested
         if config.display_output:
-            try:
-                output_key = OutputFormat(config.display_output.value)
-            except ValueError:
-                output_key = None
-            if output_key is not None and output_key in file_paths:
+            with _console_lock:
                 try:
-                    content = file_paths[output_key].read_text(encoding="utf-8")
-                    display_formatted_output(content, config.display_output, console_out)
-                except Exception as e:
-                    console_out.print(f"[bold red]Error reading output file: {str(e)}[/bold red]")
-            else:
-                console_out.print(f"[bold red]Invalid output type: {config.display_output.value}[/bold red]")
+                    output_key = OutputFormat(config.display_output.value)
+                except ValueError:
+                    output_key = None
+                if output_key is not None and output_key in file_paths:
+                    try:
+                        content = file_paths[output_key].read_text(encoding="utf-8")
+                        display_formatted_output(content, config.display_output, console_out)
+                    except Exception as e:
+                        console_out.print(f"[bold red]Error reading output file: {str(e)}[/bold red]")
+                else:
+                    console_out.print(f"[bold red]Invalid output type: {config.display_output.value}[/bold red]")
         if llm_needed:
-            console_out.print("Current session price:")
-            show_llm_cost(cb.usage_metadata, show_pricing=PricingDisplay.PRICE, console=console_out)
+            with _console_lock:
+                console_out.print("Current session price:")
+                show_llm_cost(cb.usage_metadata, show_pricing=PricingDisplay.PRICE, console=console_out)
 
-        console_out.print(
+        _print_locked(
             Panel.fit(
                 "\n".join(set([str(p) for p in file_paths.values()] + [str(raw_output_path)])),
                 title="Files",
@@ -414,7 +439,7 @@ def process_url(
         error_msg = str(e)
 
         mark_error(run_name, current_url, error_msg, error_type)
-        console_out.print(
+        _print_locked(
             f"[bold red]URL processing error ([yellow]{error_type.value}[/yellow]):[/bold red]"
             f"[blue]{escape(current_url)}[/blue] {escape(error_msg)}"
         )
@@ -423,7 +448,7 @@ def process_url(
         if error_type == ErrorType.NETWORK or error_type == ErrorType.TIMEOUT:
             domain = urlparse(current_url).netloc
             new_delay = increase_crawl_delay(domain)
-            console_out.print(f"[yellow]Increased rate limit for {domain} to {new_delay} seconds[/yellow]")
+            _print_locked(f"[yellow]Increased rate limit for {domain} to {new_delay} seconds[/yellow]")
 
 
 def run_crawl(config: ScrapeConfig) -> int:
@@ -515,17 +540,46 @@ def run_crawl(config: ScrapeConfig) -> int:
                             if len(raw_htmls) != len(urls):
                                 raise ValueError(f"Mismatch between URLs {len(urls)} and fetched data {len(raw_htmls)}")
                             url_data = zip(urls, raw_htmls, strict=True)
-                            for current_url, raw_html in url_data:
-                                process_url(
-                                    current_url,
-                                    raw_html,
-                                    config,
-                                    cb=cb,
-                                    status=status,
-                                    llm_needed=llm_needed,
-                                    llm_config=llm_config,
-                                    dynamic_model_container=dynamic_model_container,
-                                )
+                            workers = max(1, config.scrape_max_parallel)
+                            if workers == 1:
+                                # Default path: identical to pre-ENH-001 behavior.
+                                for current_url, raw_html in url_data:
+                                    process_url(
+                                        current_url,
+                                        raw_html,
+                                        config,
+                                        cb=cb,
+                                        status=status,
+                                        llm_needed=llm_needed,
+                                        llm_config=llm_config,
+                                        dynamic_model_container=dynamic_model_container,
+                                    )
+                            else:
+                                # ENH-001: overlap per-URL processing across the
+                                # batch so LLM round-trip latency is paid
+                                # concurrently. Workers never touch the live status
+                                # spinner (status=None); queue writes are safe via
+                                # the per-thread WAL connections (ENH-004).
+                                with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="scrape") as pool:
+                                    futures = {
+                                        pool.submit(
+                                            process_url,
+                                            u,
+                                            h,
+                                            config,
+                                            cb=cb,
+                                            status=None,
+                                            llm_needed=llm_needed,
+                                            llm_config=llm_config,
+                                            dynamic_model_container=dynamic_model_container,
+                                        ): u
+                                        for u, h in url_data
+                                    }
+                                    for fut in as_completed(futures):
+                                        # process_url routes its own errors to
+                                        # mark_error; result() surfaces only
+                                        # unexpected bugs (e.g. KeyboardInterrupt).
+                                        fut.result()
                         except Exception as e:
                             error_type = classify_error(e)
                             error_msg = str(e)

@@ -72,7 +72,7 @@ Crawling has three implemented modes, with a fourth planned:
 
 Crawling progress is stored in a sqlite database and all pages are tagged with the run name which can be specified with the --run-name / -n flag.
 You can resume a crawl by specifying the same run name again.
-The options `--scrape-max-parallel` / `-P` can be used to increase the scraping speed by running multiple scrapes in parallel.
+The options `--scrape-max-parallel` / `-P` set the number of workers that fetch pages and run LLM extraction in parallel within each batch. Raising it (together with `--crawl-batch-size`) is the main way to speed up multi-page crawls, because the per-page LLM round-trips overlap instead of running one at a time. The default of 1 processes pages sequentially, identical to earlier versions.
 The options `--crawl-batch-size` / `-B` should be set at least as high as the scrape max parallel option to ensure that the queue is always full.
 The options `--crawl-max-pages` / `-M` can be used to limit the total number of pages crawled in a single run.
 `--respect-robots` defaults to off; when enabled, if robots.txt cannot be fetched the crawler proceeds as if all URLs are allowed (fail-open).
@@ -204,7 +204,7 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
                                                                                                                               [default: Model, Pricing Input, Pricing Output, Cache Price]
 --scraper              -s      [selenium|playwright]                                                                          Scraper to use: 'selenium' or 'playwright' [default: playwright]
 --retries              -r      INTEGER                                                                                        Retry attempts for failed scrapes [default: 3]
---scrape-max-parallel  -P      INTEGER                                                                                        Max parallel fetch requests [default: 1]
+--scrape-max-parallel  -P      INTEGER                                                                                        Max parallel fetch and extraction workers [default: 1]
 --wait-type            -w      [none|pause|sleep|idle|selector|text]                                                          Method to use for page content load waiting [default: sleep]
 --wait-selector        -i      TEXT                                                                                           Selector or text to use for page content load waiting. [default: None]
 --headless             -h                                                                                                     Run in headless mode (for Selenium)
