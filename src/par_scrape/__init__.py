@@ -12,6 +12,12 @@ __licence__ = "MIT"
 __application_title__ = "PAR Scrape"
 __application_binary__ = "par_scrape"
 
+# Public library API (ENH-005, provisional). Imported after the module metadata
+# above is defined: par_scrape.api -> par_scrape.runner -> `from par_scrape import
+# __application_title__, __version__`, so the metadata must exist first to avoid
+# a circular import.
+from par_scrape.api import PageResult, ScrapeResult, scrape
+
 __all__: list[str] = [
     "__author__",
     "__copyright__",
@@ -22,4 +28,8 @@ __all__: list[str] = [
     "__licence__",
     "__application_title__",
     "__application_binary__",
+    # Public library API (ENH-005, provisional)
+    "PageResult",
+    "ScrapeResult",
+    "scrape",
 ]

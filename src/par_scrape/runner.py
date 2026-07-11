@@ -15,9 +15,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+from uuid import uuid4
 
 import typer
 from par_ai_core.llm_config import LlmConfig, ReasoningEffort
@@ -116,7 +118,7 @@ class ScrapeConfig:
     wait_selector: str | None
     headless: bool
     sleep_time: int
-    ai_provider: LlmProvider
+    ai_provider: LlmProvider | None
     model: str | None
     ai_base_url: str | None
     prompt_cache: bool
@@ -128,6 +130,103 @@ class ScrapeConfig:
     extraction_prompt: Path | None
     if_changed: bool
     prune: bool
+
+
+def build_config(
+    *,
+    url: str,
+    output_format: list[OutputFormat] | None = None,
+    fields: list[str] | None = None,
+    scraper: ScraperChoice = ScraperChoice.PLAYWRIGHT,
+    scrape_retries: int = 3,
+    scrape_max_parallel: int = 1,
+    run_name: str = "",
+    output_folder: Path = Path("./output"),
+    cleanup: CleanupType = CleanupType.NONE,
+    crawl_type: CrawlType = CrawlType.SINGLE_PAGE,
+    crawl_batch_size: int = 1,
+    crawl_max_pages: int = 100,
+    respect_robots: bool = False,
+    respect_rate_limits: bool = True,
+    crawl_delay: int = 1,
+    wait_type: ScraperWaitType = ScraperWaitType.SLEEP,
+    wait_selector: str | None = None,
+    headless: bool = False,
+    sleep_time: int = 2,
+    ai_provider: LlmProvider | None = None,
+    model: str | None = None,
+    ai_base_url: str | None = None,
+    prompt_cache: bool = False,
+    reasoning_effort: ReasoningEffort | None = None,
+    reasoning_budget: int | None = None,
+    display_output: DisplayOutputFormat | None = None,
+    silent: bool = False,
+    pricing: PricingDisplay = PricingDisplay.DETAILS,
+    extraction_prompt: Path | None = None,
+    if_changed: bool = False,
+    prune: bool = False,
+) -> ScrapeConfig:
+    """Resolve shared defaults and build a :class:`ScrapeConfig`.
+
+    Centralizes the run-name, URL trailing-slash, and output-format / fields
+    defaulting so the CLI (``__main__.scrape``) and the library API
+    (:func:`par_scrape.api.scrape`, ENH-005) cannot drift. Callers pass their own
+    per-surface defaults (e.g. the CLI's ``ai_provider`` option default) as
+    arguments; this helper only fills in the unresolved ones.
+
+    Args:
+        url: URL to scrape; a trailing slash is trimmed.
+        output_format: Requested output formats; defaults to Markdown only.
+        fields: Fields to extract; defaults to the standard pricing fields.
+        run_name: Run identifier; empty value resolves to a timestamp and any
+            value is sanitized to filesystem-safe characters.
+        ai_provider: LLM provider, or ``None`` for a Markdown-only (no-LLM) run.
+        **kwargs: All other :class:`ScrapeConfig` fields, passed through.
+
+    Returns:
+        A fully-resolved :class:`ScrapeConfig`.
+    """
+    output_format = output_format or [OutputFormat.MARKDOWN]
+    if fields is None:
+        fields = ["Model", "Pricing Input", "Pricing Output", "Cache Price"]
+    if not run_name:
+        run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+    else:
+        sanitized = "".join(c for c in run_name if c.isalnum() or c in ("-", "_"))
+        run_name = sanitized or str(uuid4())
+    return ScrapeConfig(
+        url=url.rstrip("/"),
+        output_format=output_format,
+        fields=fields,
+        scraper=scraper,
+        scrape_retries=scrape_retries,
+        scrape_max_parallel=scrape_max_parallel,
+        run_name=run_name,
+        output_folder=output_folder,
+        cleanup=cleanup,
+        crawl_type=crawl_type,
+        crawl_batch_size=crawl_batch_size,
+        crawl_max_pages=crawl_max_pages,
+        respect_robots=respect_robots,
+        respect_rate_limits=respect_rate_limits,
+        crawl_delay=crawl_delay,
+        wait_type=wait_type,
+        wait_selector=wait_selector,
+        headless=headless,
+        sleep_time=sleep_time,
+        ai_provider=ai_provider,
+        model=model,
+        ai_base_url=ai_base_url,
+        prompt_cache=prompt_cache,
+        reasoning_effort=reasoning_effort,
+        reasoning_budget=reasoning_budget,
+        display_output=display_output,
+        silent=silent,
+        pricing=pricing,
+        extraction_prompt=extraction_prompt,
+        if_changed=if_changed,
+        prune=prune,
+    )
 
 
 def _remove_run_output(output_folder: Path, run_name: str) -> None:
@@ -162,6 +261,10 @@ def validate_llm_options(
     llm_needed = any(format in config.output_format for format in outputs_needing_llm)
     model = config.model
     if llm_needed:
+        # llm_needed is derived from the output formats, and the library API
+        # (ENH-005) raises before reaching here when an LLM format is requested
+        # without a provider, so a provider is guaranteed.
+        assert config.ai_provider is not None
         if not model:
             model = provider_default_models[config.ai_provider]
 
@@ -198,6 +301,7 @@ def validate_llm_options(
 def print_config_panels(config: ScrapeConfig, model: str | None, llm_needed: bool) -> None:
     """Render the AI configuration and scraping configuration Rich panels."""
     if llm_needed:
+        assert config.ai_provider is not None
         console_out.print(
             Panel.fit(
                 Text.assemble(
@@ -550,13 +654,14 @@ def run_crawl(config: ScrapeConfig) -> int:
     # setdefault preserves a user-provided USER_AGENT.
     os.environ.setdefault("USER_AGENT", f"{__application_title__} {__version__}")
 
-    llm_needed, model, llm_config, dynamic_model_container = validate_llm_options(config)
-    print_config_panels(config, model, llm_needed)
-
-    run_name = config.run_name
-
     exit_code = 0
+    # validate_llm_options and print_config_panels are inside the capture block
+    # so ``--silent`` (CLI) and ``quiet=True`` (API, ENH-005) suppress the config
+    # panels too, not just the crawl-loop output.
     with console_out.capture() if config.silent else nullcontext():
+        llm_needed, model, llm_config, dynamic_model_container = validate_llm_options(config)
+        print_config_panels(config, model, llm_needed)
+        run_name = config.run_name
         if config.cleanup in [CleanupType.BEFORE, CleanupType.BOTH]:
             _remove_run_output(config.output_folder, run_name)
         try:

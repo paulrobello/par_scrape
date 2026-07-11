@@ -1,9 +1,7 @@
 """Main entry point for par_scrape."""
 
-from datetime import datetime
 from pathlib import Path
 from typing import Annotated
-from uuid import uuid4
 
 import typer
 from dotenv import load_dotenv
@@ -19,7 +17,7 @@ from par_scrape import __application_title__, __version__
 from par_scrape.crawl import CrawlType
 from par_scrape.enums import CleanupType, OutputFormat
 from par_scrape.queue_cli import queue_app
-from par_scrape.runner import ScrapeConfig, run_crawl
+from par_scrape.runner import build_config, run_crawl
 
 
 class _DefaultScrapeGroup(TyperGroup):
@@ -299,27 +297,7 @@ def scrape(
             raise typer.Exit(code=1)
         load_dotenv(dotenv_path=env_file)
 
-    output_format = output_format or [OutputFormat.MARKDOWN]
-    fields = fields or ["Model", "Pricing Input", "Pricing Output", "Cache Price"]
-
-    if display_output and display_output not in output_format:
-        console_out.print(
-            f"[bold red]Display output format '{display_output}' is not in the specified output formats.[/bold red]"
-        )
-        raise typer.Exit(1)
-
-    # Generate run_name if not provided
-    if not run_name:
-        run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-    else:
-        # Ensure run_name is filesystem-friendly
-        run_name = "".join(c for c in run_name if c.isalnum() or c in ("-", "_"))
-        if not run_name:
-            run_name = str(uuid4())
-
-    url = url.rstrip("/")
-
-    config = ScrapeConfig(
+    config = build_config(
         url=url,
         output_format=output_format,
         fields=fields,
@@ -352,6 +330,12 @@ def scrape(
         if_changed=if_changed,
         prune=prune,
     )
+
+    if display_output and display_output not in config.output_format:
+        console_out.print(
+            f"[bold red]Display output format '{display_output}' is not in the specified output formats.[/bold red]"
+        )
+        raise typer.Exit(1)
 
     code = run_crawl(config)
     if code:

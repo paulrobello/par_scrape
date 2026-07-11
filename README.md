@@ -314,6 +314,43 @@ You *MUST* call the `DynamicListingsContainer` function with the extracted data.
 ```
 
 
+## Library usage
+
+par_scrape is also usable as a library — `from par_scrape import scrape` — for pipelines, notebooks, and other agents. The API is **provisional** for one release and may change before stabilization.
+
+Markdown-only (no LLM, no API key needed):
+
+```python
+from par_scrape import scrape
+
+result = scrape("https://example.com/docs")
+print(result.ok)                    # True when every page reached COMPLETED
+for page in result.pages:
+    print(page.url, page.status, page.file_paths)
+```
+
+Structured extraction with an LLM (provider API keys must be in the environment — the library does not load `~/.par_scrape.env`):
+
+```python
+from par_scrape import scrape
+from par_scrape.enums import OutputFormat
+
+result = scrape(
+    "https://example.com/pricing",
+    fields=["Model", "Price"],
+    output_formats=[OutputFormat.JSON, OutputFormat.MARKDOWN],
+    ai_provider="anthropic",
+    model="claude-3-5-sonnet-latest",
+)
+if not result.ok:
+    for page in result.pages:
+        if page.status.value == "error":
+            print(page.url, page.error_message)
+```
+
+Notes: configuration problems (unknown provider, an LLM format requested without a provider, a missing API key) raise `ProviderConfigError` / `CrawlConfigError`; per-page failures do not raise — they appear as `PageResult` entries with `status == "error"`. `quiet=True` (the default) suppresses all console output. Advanced `ScrapeConfig` fields (e.g. `scraper`, `wait_type`, `prune`, `respect_robots`) can be passed as keyword arguments.
+
+
 ## Roadmap
 - API Server
 - More crawling options
