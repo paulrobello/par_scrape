@@ -56,6 +56,7 @@ from par_scrape.crawl import (
 )
 from par_scrape.enums import CleanupType, ErrorType, OutputFormat
 from par_scrape.exceptions import ScrapeError, classify_error
+from par_scrape.prune import prune_markdown
 from par_scrape.queue_db import close_connections
 from par_scrape.scrape_data import (
     create_container_model,
@@ -126,6 +127,7 @@ class ScrapeConfig:
     pricing: PricingDisplay
     extraction_prompt: Path | None
     if_changed: bool
+    prune: bool
 
 
 def _remove_run_output(output_folder: Path, run_name: str) -> None:
@@ -445,13 +447,20 @@ def process_url(
                     _print_locked(f"[cyan]Unchanged since previous run — reused extraction for {escape(current_url)}")
                     return
 
+        # ENH-003: prune boilerplate from only the markdown sent to the LLM.
+        # The raw save above and the content hash both use the unpruned markdown,
+        # so the on-disk artifact and the --if-changed match key are unaffected.
+        markdown_for_llm = prune_markdown(markdown) if config.prune else markdown
+        if config.prune and len(markdown_for_llm) < len(markdown):
+            _print_locked(f"[cyan]Pruned markdown: {len(markdown):,} -> {len(markdown_for_llm):,} chars")
+
         if llm_needed:
             if status is not None:
                 status.update("[bold cyan]Extracting data with LLM...")
             if dynamic_model_container is None or llm_config is None:
                 raise RuntimeError("LLM configuration is required but was not initialized")
             formatted_data = format_data(
-                data=markdown,
+                data=markdown_for_llm,
                 dynamic_listings_container=dynamic_model_container,
                 llm_config=llm_config,
                 prompt_cache=config.prompt_cache,

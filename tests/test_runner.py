@@ -61,6 +61,7 @@ def _make_config(output_folder: Path, **overrides) -> ScrapeConfig:
         pricing=PricingDisplay.NONE,
         extraction_prompt=None,
         if_changed=False,
+        prune=False,
     )
     defaults.update(overrides)
     return ScrapeConfig(**defaults)

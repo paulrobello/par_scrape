@@ -194,6 +194,13 @@ def main(
             "(matched by content hash); reuses that run's extracted outputs.",
         ),
     ] = False,
+    prune: Annotated[
+        bool,
+        typer.Option(
+            "--prune",
+            help="Prune navigation/boilerplate from page content before LLM extraction to reduce token cost.",
+        ),
+    ] = False,
     crawl_type: Annotated[
         CrawlType,
         typer.Option(
@@ -309,6 +316,7 @@ def main(
         pricing=pricing,
         extraction_prompt=extraction_prompt,
         if_changed=if_changed,
+        prune=prune,
     )
 
     code = run_crawl(config)

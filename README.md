@@ -90,6 +90,12 @@ When enabled, each completed page records a SHA-256 of its converted Markdown (n
 
 `--if-changed` is off by default; omit it for the original always-extract behavior. It has no effect on Markdown-only runs (no LLM is used there anyway).
 
+### Content pruning
+
+Each page's converted Markdown is sent to the LLM in full, including navigation bars, footers, link farms, and other boilerplate that never contains the fields you want. Pass `--prune` to strip that boilerplate before extraction, which typically cuts input tokens 30–60% on docs/product pages with no loss in extracted fields, lowering both cost and latency on every LLM call.
+
+The heuristics are deliberately conservative: headings, tables, and code blocks are kept verbatim, and any line containing a digit (prices, specs, model numbers) is always preserved. Only runs of four or more link-only list items (a nav menu or footer link farm), empty-text link items, and bare-URL / image-only lines are removed. Only the Markdown sent to the LLM is pruned — the saved raw file and the `--if-changed` content hash still use the full Markdown, so pruning never affects your on-disk artifact or incremental-rescrape matching. `--prune` is off by default and has no effect on Markdown-only runs.
+
 ## Prerequisites
 
 To install PAR Scrape, make sure you have Python 3.11 or higher. Python 3.14 is the default and recommended version (supports Python 3.11-3.14).
@@ -239,6 +245,7 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 --respect-robots                                                                                                              Whether to respect robots.txt [default: False]
 --crawl-delay                  INTEGER                                                                                        Default delay in seconds between requests to the same domain [default: 1]
 --if-changed                                                                                                                  Skip LLM extraction for pages unchanged since a previous completed run (matched by content hash); reuses that run's extracted outputs. [default: False]
+--prune                                                                                                                        Prune navigation/boilerplate from page content before LLM extraction to reduce token cost. [default: False]
 --version              -v
 --help                                                                                                                        Show this message and exit.
 ```
