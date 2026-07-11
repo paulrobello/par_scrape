@@ -87,6 +87,7 @@ jobs:
         run: |
           payload=$(jq -n --arg content "A new release $REF_NAME has been created for $REPO." '{content: $content}')
           curl -sf -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK"
+        continue-on-error: true
 
       - name: Cleanup on failure
         if: failure()
