@@ -21,7 +21,7 @@ DB_PATH = BASE_PATH / "jobs.sqlite"
 # Current database schema version. Bumping this causes an existing, older
 # database to be moved aside (see ``_rename_db_aside``) rather than silently
 # recreated, so the user's crawl history is never lost on upgrade.
-DB_VERSION = 2
+DB_VERSION = 3
 
 # Maximum characters of an error message persisted to the scrape table; keeps
 # the error_msg column bounded on pathological failures. See ``mark_error``.
@@ -218,6 +218,7 @@ def init_db(db_path: Path | None = None) -> None:
                     error_msg TEXT,
                     raw_file_path TEXT,
                     file_paths TEXT,
+                    content_hash TEXT,
                     scraped INTEGER,
                     queued_at INTEGER DEFAULT (strftime('%s','now')),
                     last_processed_at INTEGER,
@@ -254,7 +255,7 @@ def init_db(db_path: Path | None = None) -> None:
                 INSERT INTO db_version (version, description)
                 VALUES (?, ?)
                 """,
-                (DB_VERSION, "Schema v2: per-format path columns collapsed into file_paths JSON"),
+                (DB_VERSION, "Schema v3: content_hash column for incremental re-scrape (ENH-002)"),
             )
 
 
@@ -538,6 +539,7 @@ def mark_complete(
     *,
     raw_file_path: Path,
     file_paths: dict[OutputFormat, Path],
+    content_hash: str | None = None,
     cost: float = 0.0,
     db_path: Path | None = None,
 ) -> None:
@@ -549,6 +551,9 @@ def mark_complete(
         url: URL that was successfully processed
         raw_file_path: Path to the raw output file
         file_paths: Dictionary mapping output formats to file paths
+        content_hash: SHA-256 of the page markdown, recorded so a later run with
+            ``--if-changed`` can reuse this row's outputs when the page is
+            unchanged (ENH-002). ``None`` when hashing is not applicable.
         cost: Cost of processing this URL (if applicable)
         db_path: Database file to write to. Defaults to :data:`DB_PATH` when ``None``.
     """
@@ -559,7 +564,7 @@ def mark_complete(
             """
             UPDATE scrape
             SET status = ?, scraped = strftime('%s','now'), error_msg = null, error_type = null,
-            raw_file_path = ?, file_paths = ?,
+            raw_file_path = ?, file_paths = ?, content_hash = ?,
             cost = ?, last_processed_at = strftime('%s','now')
             WHERE ticket_id = ? AND url = ?
             """,
@@ -567,6 +572,7 @@ def mark_complete(
                 PageStatus.COMPLETED.value,
                 str(raw_file_path),
                 json.dumps({fmt.value: str(p) for fmt, p in file_paths.items()}, ensure_ascii=False),
+                content_hash,
                 cost,
                 ticket_id,
                 url.rstrip("/"),
@@ -611,3 +617,48 @@ def mark_error(
                 url.rstrip("/"),
             ),
         )
+
+
+def find_completed_by_hash(
+    url: str,
+    content_hash: str,
+    exclude_ticket_id: str,
+    db_path: Path | None = None,
+) -> dict[str, str | None] | None:
+    """Find the most recent completed row for ``url`` + ``content_hash`` in another run.
+
+    Used by ENH-002's incremental re-scrape: when a page's markdown hash matches
+    a prior completed crawl of the same URL, that run's extracted outputs can be
+    reused instead of re-running LLM extraction. The current run
+    (``exclude_ticket_id``) is excluded so a row can never match itself.
+
+    Args:
+        url: The URL whose prior completion is sought, in the normalized form
+            stored in the queue (i.e. the ``current_url`` value seen by
+            ``process_url``).
+        content_hash: SHA-256 hex digest of the page markdown.
+        exclude_ticket_id: The current run's ``ticket_id``; rows with this
+            ticket_id are never returned.
+        db_path: Database file to query. Defaults to :data:`DB_PATH` when ``None``.
+
+    Returns:
+        A dict with the matching row's ``raw_file_path`` and ``file_paths`` (the
+        latter as the stored JSON string), or ``None`` when no prior completed
+        row matches.
+    """
+    db_path = db_path if db_path is not None else DB_PATH
+    conn = _get_connection(db_path)
+    with conn:
+        row = conn.execute(
+            """
+            SELECT raw_file_path, file_paths
+            FROM scrape
+            WHERE url = ? AND content_hash = ? AND status = ? AND ticket_id != ?
+            ORDER BY rowid DESC
+            LIMIT 1
+            """,
+            (url.rstrip("/"), content_hash, PageStatus.COMPLETED.value, exclude_ticket_id),
+        ).fetchone()
+    if row is None:
+        return None
+    return {"raw_file_path": row[0], "file_paths": row[1]}

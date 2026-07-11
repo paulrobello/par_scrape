@@ -18,6 +18,7 @@ PAR Scrape is a versatile web scraping tool with options for Selenium or Playwri
 - [How it works](#how-it-works)
 - [Site Crawling](#site-crawling)
   - [Crawl state](#crawl-state)
+  - [Incremental crawls](#incremental-crawls)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -80,6 +81,14 @@ The options `--crawl-max-pages` / `-M` can be used to limit the total number of 
 ### Crawl state
 
 Crawl state is persisted in an SQLite database at `~/.par_scrape/jobs.sqlite`, and every page is tagged with its run name (`--run-name` / `-n`). Provider and other configuration is read from `~/.par_scrape.env` (auto-migrated from the legacy `~/.par-scrape.env` on first run). When the database schema is upgraded in a new release, the older database is renamed aside to `jobs.sqlite.bak-v<version>` (for example `jobs.sqlite.bak-v1`) rather than deleted, so crawl history survives an upgrade. To reset a stuck run, delete the `jobs.sqlite` file or start fresh with a new `--run-name`.
+
+### Incremental crawls
+
+Re-running a crawl normally re-sends every page to the LLM even when nothing changed, because each `--run-name` is an isolated namespace that pays the full extraction cost again. Pass `--if-changed` to skip LLM extraction for pages whose content is unchanged since a previous completed run.
+
+When enabled, each completed page records a SHA-256 of its converted Markdown (not the raw HTML, which carries volatile CSRF tokens and timestamps). On a later `--if-changed` run, a page whose Markdown hash matches a prior completed crawl of the same URL reuses that run's extracted outputs — they are copied into the new run's output folder and the row is marked complete without an LLM call. Pages whose content changed (different hash), pages that never ran before, and any page where a prior output file has since been deleted fall through to normal LLM extraction, so the result is always complete.
+
+`--if-changed` is off by default; omit it for the original always-extract behavior. It has no effect on Markdown-only runs (no LLM is used there anyway).
 
 ## Prerequisites
 
@@ -229,6 +238,7 @@ par_scrape --url "https://openai.com/api/pricing/" -f "Title" -f "Description" -
 --respect-rate-limits                                                                                                         Whether to use domain-specific rate limiting [default: True]
 --respect-robots                                                                                                              Whether to respect robots.txt [default: False]
 --crawl-delay                  INTEGER                                                                                        Default delay in seconds between requests to the same domain [default: 1]
+--if-changed                                                                                                                  Skip LLM extraction for pages unchanged since a previous completed run (matched by content hash); reuses that run's extracted outputs. [default: False]
 --version              -v
 --help                                                                                                                        Show this message and exit.
 ```

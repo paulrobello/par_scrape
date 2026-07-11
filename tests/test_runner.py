@@ -21,6 +21,7 @@ from par_scrape.__main__ import app
 from par_scrape.crawl import PageStatus, add_to_queue, get_queue_stats
 from par_scrape.enums import CleanupType, CrawlType, ErrorType, OutputFormat
 from par_scrape.runner import ScrapeConfig, process_url, run_crawl
+from par_scrape.scrape_data import create_container_model, create_dynamic_model
 
 
 def _make_config(output_folder: Path, **overrides) -> ScrapeConfig:
@@ -59,6 +60,7 @@ def _make_config(output_folder: Path, **overrides) -> ScrapeConfig:
         silent=True,
         pricing=PricingDisplay.NONE,
         extraction_prompt=None,
+        if_changed=False,
     )
     defaults.update(overrides)
     return ScrapeConfig(**defaults)
@@ -278,3 +280,146 @@ def test_run_crawl_concurrent_pool_isolates_per_url_errors(tmp_path, db_path, mo
         ).fetchone()
     assert row is not None
     assert row[0] == ErrorType.TIMEOUT.value
+
+
+# ---------- ENH-002: incremental re-scrape ----------
+
+_TEST_URL = "https://example.com/testpage"
+
+
+def _extracted_container():
+    """A real DynamicListingsContainer instance the mocked ``format_data`` returns.
+
+    ``process_url`` checks ``formatted_data.listings`` is non-empty and then
+    passes the instance to the real ``save_formatted_data``, so it must be a
+    genuine pydantic object that writes a real ``extracted_data.json`` for the
+    reuse path to copy.
+    """
+    container_cls = create_container_model(create_dynamic_model(["title"]))
+    return container_cls(listings=[{"title": "sample"}])
+
+
+def _run_process_url_llm(tmp_path, db_path, mocker, run_name, raw_html):
+    """Run ``process_url`` once for a JSON/LLM single-page URL under ``run_name``.
+
+    ``format_data``, ``html_to_markdown``, and ``show_llm_cost`` are patched at
+    their use site in the runner. ``format_data`` is the only one whose call
+    count matters: it stands in for the billed LLM round trip.
+    """
+    cfg = _make_config(
+        output_folder=tmp_path,
+        run_name=run_name,
+        url=_TEST_URL,
+        output_format=[OutputFormat.JSON],
+        fields=["title"],
+        crawl_type=CrawlType.SINGLE_PAGE,
+        if_changed=True,
+    )
+    container_cls = create_container_model(create_dynamic_model(["title"]))
+    add_to_queue(run_name, [cfg.url], db_path=db_path)
+    process_url(
+        cfg.url,
+        raw_html,
+        cfg,
+        cb=mocker.MagicMock(),
+        status=mocker.MagicMock(),
+        llm_needed=True,
+        llm_config=mocker.MagicMock(),
+        dynamic_model_container=container_cls,
+    )
+    return cfg
+
+
+def test_process_url_if_changed_skips_unchanged_page(tmp_path, db_path, mocker):
+    """ENH-002: a second run with identical markdown reuses the first run's outputs.
+
+    Two runs under different run_names with the same canned HTML produce the same
+    content hash; the second run must NOT call ``format_data`` (the billed LLM
+    step) and must surface run-a's extracted JSON in its own output folder.
+    """
+    fmt_mock = mocker.patch("par_scrape.runner.format_data", return_value=_extracted_container())
+    mocker.patch("par_scrape.runner.html_to_markdown", side_effect=lambda raw, **_kw: raw)
+    mocker.patch("par_scrape.runner.show_llm_cost")
+
+    html = "<html><body><p>same content</p></body></html>"
+    _run_process_url_llm(tmp_path, db_path, mocker, "run-a", html)
+    _run_process_url_llm(tmp_path, db_path, mocker, "run-b", html)
+
+    assert fmt_mock.call_count == 1  # only run-a paid for extraction
+    run_b_json = tmp_path / "run-b" / "example.com" / "testpage" / "extracted_data.json"
+    assert run_b_json.exists(), "run-b should have reused run-a's extracted JSON"
+
+
+def test_process_url_if_changed_reextracts_when_content_changes(tmp_path, db_path, mocker):
+    """ENH-002: changed markdown -> different hash -> no prior match -> re-extract.
+
+    Both runs pay for extraction (``format_data`` called twice).
+    """
+    fmt_mock = mocker.patch("par_scrape.runner.format_data", return_value=_extracted_container())
+    mocker.patch("par_scrape.runner.html_to_markdown", side_effect=lambda raw, **_kw: raw)
+    mocker.patch("par_scrape.runner.show_llm_cost")
+
+    _run_process_url_llm(tmp_path, db_path, mocker, "run-a", "<html><body>AAA</body></html>")
+    _run_process_url_llm(tmp_path, db_path, mocker, "run-b", "<html><body>BBB</body></html>")
+
+    assert fmt_mock.call_count == 2
+
+
+def test_process_url_if_changed_falls_through_when_prior_output_missing(tmp_path, db_path, mocker):
+    """ENH-002: a missing prior output file must degrade gracefully to extraction.
+
+    The hash matches a prior completed row, but that run's extracted JSON has
+    since been deleted. ``_copy_prior_outputs`` returns None and run-b re-extracts
+    rather than silently producing no output.
+    """
+    fmt_mock = mocker.patch("par_scrape.runner.format_data", return_value=_extracted_container())
+    mocker.patch("par_scrape.runner.html_to_markdown", side_effect=lambda raw, **_kw: raw)
+    mocker.patch("par_scrape.runner.show_llm_cost")
+
+    html = "<html><body><p>same content</p></body></html>"
+    _run_process_url_llm(tmp_path, db_path, mocker, "run-a", html)
+
+    run_a_json = tmp_path / "run-a" / "example.com" / "testpage" / "extracted_data.json"
+    assert run_a_json.exists()
+    run_a_json.unlink()  # simulate the prior run's output being cleaned up
+
+    _run_process_url_llm(tmp_path, db_path, mocker, "run-b", html)
+
+    assert fmt_mock.call_count == 2  # could not reuse, re-extracted
+
+
+def test_process_url_if_changed_off_by_default(tmp_path, db_path, mocker):
+    """ENH-002: without --if-changed, an unchanged page is re-extracted every run.
+
+    Guards against the reuse path firing when the flag was never set.
+    """
+    fmt_mock = mocker.patch("par_scrape.runner.format_data", return_value=_extracted_container())
+    mocker.patch("par_scrape.runner.html_to_markdown", side_effect=lambda raw, **_kw: raw)
+    mocker.patch("par_scrape.runner.show_llm_cost")
+
+    html = "<html><body><p>same content</p></body></html>"
+    # Build configs explicitly with if_changed=False (the _make_config default).
+    for run_name in ("run-a", "run-b"):
+        cfg = _make_config(
+            output_folder=tmp_path,
+            run_name=run_name,
+            url=_TEST_URL,
+            output_format=[OutputFormat.JSON],
+            fields=["title"],
+            crawl_type=CrawlType.SINGLE_PAGE,
+            if_changed=False,
+        )
+        container_cls = create_container_model(create_dynamic_model(["title"]))
+        add_to_queue(run_name, [cfg.url], db_path=db_path)
+        process_url(
+            cfg.url,
+            html,
+            cfg,
+            cb=mocker.MagicMock(),
+            status=mocker.MagicMock(),
+            llm_needed=True,
+            llm_config=mocker.MagicMock(),
+            dynamic_model_container=container_cls,
+        )
+
+    assert fmt_mock.call_count == 2  # no reuse: both runs extracted

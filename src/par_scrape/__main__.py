@@ -186,6 +186,14 @@ def main(
         Path | None,
         typer.Option("--extraction-prompt", "-e", help="Path to the extraction prompt file"),
     ] = None,
+    if_changed: Annotated[
+        bool,
+        typer.Option(
+            "--if-changed",
+            help="Skip LLM extraction for pages unchanged since a previous completed run "
+            "(matched by content hash); reuses that run's extracted outputs.",
+        ),
+    ] = False,
     crawl_type: Annotated[
         CrawlType,
         typer.Option(
@@ -300,6 +308,7 @@ def main(
         silent=silent,
         pricing=pricing,
         extraction_prompt=extraction_prompt,
+        if_changed=if_changed,
     )
 
     code = run_crawl(config)

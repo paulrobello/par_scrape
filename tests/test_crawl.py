@@ -598,3 +598,84 @@ class TestConnectionReuse:
         assert errors == []
         stats = queue_db.get_queue_stats("ticket", db_path=db_path)
         assert stats[PageStatus.COMPLETED.value] == 100
+
+
+class TestFindCompletedByHash:
+    """ENH-002: locate a prior run's completed row by URL + content hash."""
+
+    URL = "https://example.com/page1"
+
+    def _insert_row(
+        self, db_path, ticket_id, content_hash, status=PageStatus.COMPLETED.value, file_paths='{"json": "/tmp/a.json"}'
+    ):
+        with closing(sqlite3.connect(db_path)) as conn, conn:
+            conn.execute(
+                "INSERT INTO scrape (ticket_id, url, status, content_hash, file_paths) VALUES (?, ?, ?, ?, ?)",
+                (ticket_id, self.URL, status, content_hash, file_paths),
+            )
+
+    def test_finds_prior_completed_row_from_another_run(self, db_path):
+        self._insert_row(db_path, "run-a", "hash-abc")
+        result = queue_db.find_completed_by_hash(self.URL, "hash-abc", exclude_ticket_id="run-b")
+        assert result is not None
+        assert result["file_paths"] == '{"json": "/tmp/a.json"}'
+
+    def test_excludes_current_run_self(self, db_path):
+        self._insert_row(db_path, "run-a", "hash-abc")
+        assert queue_db.find_completed_by_hash(self.URL, "hash-abc", exclude_ticket_id="run-a") is None
+
+    def test_returns_none_when_hash_differs(self, db_path):
+        self._insert_row(db_path, "run-a", "hash-abc")
+        assert queue_db.find_completed_by_hash(self.URL, "hash-different", exclude_ticket_id="run-b") is None
+
+    def test_returns_none_when_prior_row_errored(self, db_path):
+        self._insert_row(db_path, "run-a", "hash-abc", status=PageStatus.ERROR.value)
+        assert queue_db.find_completed_by_hash(self.URL, "hash-abc", exclude_ticket_id="run-b") is None
+
+    def test_returns_most_recent_when_multiple_prior_runs_match(self, db_path):
+        # Two prior runs with the same url+hash; rowid DESC must pick the last inserted.
+        self._insert_row(db_path, "run-a", "hash-abc", file_paths='{"json": "/tmp/old.json"}')
+        self._insert_row(db_path, "run-b", "hash-abc", file_paths='{"json": "/tmp/new.json"}')
+        result = queue_db.find_completed_by_hash(self.URL, "hash-abc", exclude_ticket_id="run-current")
+        assert result is not None
+        assert result["file_paths"] == '{"json": "/tmp/new.json"}'
+
+
+class TestContentHashColumn:
+    """ENH-002: mark_complete records the content_hash for incremental reuse."""
+
+    def test_mark_complete_stores_content_hash(self, db_path):
+        crawl.add_to_queue("Ticket1", [TestFindCompletedByHash.URL], db_path=db_path)
+        crawl.mark_complete(
+            "Ticket1",
+            TestFindCompletedByHash.URL,
+            raw_file_path=Path("/tmp/raw.html"),
+            file_paths={crawl.OutputFormat.JSON: Path("/tmp/a.json")},
+            content_hash="deadbeef",
+            db_path=db_path,
+        )
+        with closing(sqlite3.connect(db_path)) as conn, conn:
+            row = conn.execute(
+                "SELECT content_hash FROM scrape WHERE ticket_id = ? AND url = ?",
+                ("Ticket1", TestFindCompletedByHash.URL),
+            ).fetchone()
+        assert row is not None
+        assert row[0] == "deadbeef"
+
+    def test_mark_complete_content_hash_defaults_to_null(self, db_path):
+        url = "https://example.com/page2"
+        crawl.add_to_queue("Ticket1", [url], db_path=db_path)
+        crawl.mark_complete(
+            "Ticket1",
+            url,
+            raw_file_path=Path("/tmp/raw.html"),
+            file_paths={},
+            db_path=db_path,
+        )
+        with closing(sqlite3.connect(db_path)) as conn, conn:
+            row = conn.execute(
+                "SELECT content_hash FROM scrape WHERE ticket_id = ? AND url = ?",
+                ("Ticket1", url),
+            ).fetchone()
+        assert row is not None
+        assert row[0] is None

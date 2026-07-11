@@ -6,6 +6,8 @@ The CLI layer parses options and builds a :class:`ScrapeConfig`; everything belo
 it can be tested in isolation.
 """
 
+import hashlib
+import json
 import os
 import shutil
 import threading
@@ -41,6 +43,7 @@ from par_scrape.crawl import (
     PageStatus,
     add_to_queue,
     extract_links,
+    find_completed_by_hash,
     get_next_urls,
     get_queue_stats,
     get_url_depth,
@@ -122,6 +125,7 @@ class ScrapeConfig:
     silent: bool
     pricing: PricingDisplay
     extraction_prompt: Path | None
+    if_changed: bool
 
 
 def _remove_run_output(output_folder: Path, run_name: str) -> None:
@@ -287,6 +291,48 @@ def print_config_panels(config: ScrapeConfig, model: str | None, llm_needed: boo
     )
 
 
+def _copy_prior_outputs(
+    prior: dict[str, str | None],
+    url_output_folder: Path,
+    output_formats: list[OutputFormat],
+) -> dict[OutputFormat, Path] | None:
+    """Copy a prior run's extracted outputs into this run's URL folder.
+
+    ENH-002 reuse step: when a page's markdown hash matches a prior completed
+    run, that run's output files are copied (same basenames) into the current
+    run's ``url_output_folder`` so the crawl result is identical without paying
+    for LLM extraction.
+
+    Args:
+        prior: A ``find_completed_by_hash`` result carrying the prior row's
+            ``file_paths`` JSON string.
+        url_output_folder: The current run's output folder for this URL.
+        output_formats: Every format the current run requests.
+
+    Returns:
+        A mapping of each requested format to its copied path when the prior run
+        held every requested format and each source file still exists on disk;
+        otherwise ``None`` to tell the caller to fall through to LLM extraction.
+    """
+    prior_paths_raw = prior.get("file_paths")
+    if not prior_paths_raw:
+        return None
+    prior_paths = json.loads(prior_paths_raw)
+
+    copied: dict[OutputFormat, Path] = {}
+    for fmt in output_formats:
+        src_str = prior_paths.get(fmt.value)
+        if not src_str:
+            return None
+        src = Path(src_str)
+        if not src.exists():
+            return None
+        dst = url_output_folder / src.name
+        shutil.copyfile(src, dst)
+        copied[fmt] = dst
+    return copied
+
+
 def process_url(
     current_url: str,
     raw_html: str,
@@ -372,6 +418,33 @@ def process_url(
             status.update("[bold cyan]Saving raw data...")
         raw_output_path = save_raw_data(markdown, url_output_folder)
 
+        # ENH-002: hash the converted markdown, not the raw HTML. HTML carries
+        # volatile noise (CSRF tokens, per-request timestamps in attributes) that
+        # markdown conversion mostly strips, so the hash stays stable across
+        # fetches of an unchanged page.
+        content_hash = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
+
+        # Reuse a prior run's extracted outputs when the page is unchanged and
+        # LLM extraction would otherwise be re-paid. find_completed_by_hash
+        # excludes the current run by ticket_id so a row can never match itself.
+        # If reuse is not possible (no prior match, a requested format is absent
+        # from the prior run, or a prior output file was since deleted) we fall
+        # through to normal LLM extraction below.
+        if config.if_changed and llm_needed:
+            prior = find_completed_by_hash(current_url, content_hash, run_name)
+            if prior is not None:
+                copied_paths = _copy_prior_outputs(prior, url_output_folder, config.output_format)
+                if copied_paths is not None:
+                    mark_complete(
+                        run_name,
+                        current_url,
+                        raw_file_path=raw_output_path,
+                        file_paths=copied_paths,
+                        content_hash=content_hash,
+                    )
+                    _print_locked(f"[cyan]Unchanged since previous run — reused extraction for {escape(current_url)}")
+                    return
+
         if llm_needed:
             if status is not None:
                 status.update("[bold cyan]Extracting data with LLM...")
@@ -406,6 +479,7 @@ def process_url(
             current_url,
             raw_file_path=raw_output_path,
             file_paths=file_paths,
+            content_hash=content_hash,
         )
 
         # Display output if requested
