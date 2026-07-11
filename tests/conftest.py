@@ -10,6 +10,7 @@ the module global keeps working. New tests should prefer explicit
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -25,3 +26,15 @@ def db_path(tmp_path: Path) -> Path:
     # Back-compat: tests/code that still read the module global keep working.
     queue_db.DB_PATH = path
     return path
+
+
+@pytest.fixture(autouse=True)
+def _close_queue_connections() -> Generator[None, None, None]:
+    """Close cached per-thread SQLite connections after each test.
+
+    ``queue_db._get_connection`` caches connections for reuse (ENH-004). Without
+    this teardown those long-lived handles would leak across tests as
+    ``ResourceWarning``.
+    """
+    yield
+    queue_db.close_connections()

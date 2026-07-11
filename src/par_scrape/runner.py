@@ -50,6 +50,7 @@ from par_scrape.crawl import (
 )
 from par_scrape.enums import CleanupType, ErrorType, OutputFormat
 from par_scrape.exceptions import ScrapeError, classify_error
+from par_scrape.queue_db import close_connections
 from par_scrape.scrape_data import (
     create_container_model,
     create_dynamic_model,
@@ -546,6 +547,7 @@ def run_crawl(config: ScrapeConfig) -> int:
             console_out.print(f"[bold red]A general error occurred:[/bold red] {str(e)}")
             exit_code = 1
         finally:
+            close_connections()
             if config.cleanup in [CleanupType.BOTH, CleanupType.AFTER]:
                 with console_out.status("[bold yellow]Cleaning up..."):
                     _remove_run_output(config.output_folder, run_name)

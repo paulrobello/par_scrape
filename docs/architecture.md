@@ -149,6 +149,8 @@ The queue lives in SQLite at `~/.par_scrape/jobs.sqlite` (schema version `DB_VER
 
 `increase_crawl_delay` multiplies the delay (capped at 30 seconds) to back off on network and timeout failures; `set_crawl_delay` / `get_next_urls` read and update it.
 
+Queue connections are cached per thread (`queue_db._get_connection`) and opened in WAL journal mode with a 5-second `busy_timeout`, so the upcoming thread-pool extraction stage (ENH-001) can read and write concurrently without `database is locked` errors. `init_db` keeps short-lived direct connections for schema probing and calls `close_connections()` before moving an incompatible database aside, dropping any `-wal`/`-shm` sidecar files with it.
+
 ## External Dependencies
 
 - **[par-ai-core](https://github.com/paulrobello/par_ai_core)** — the load-bearing external dependency. Provides `fetch_url` (Selenium/Playwright fetching), `html_to_markdown`, `LlmConfig` and the LLM provider matrix, pricing/cost reporting, and the Rich `console_out` used throughout. PAR Scrape's own code is the orchestration, persistence, and extraction-policy layer on top of it.

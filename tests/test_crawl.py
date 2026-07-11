@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import threading
 from contextlib import closing
 from pathlib import Path
 from urllib.parse import urlparse
@@ -540,3 +541,60 @@ def test_init_db_upgrades_old_v1_database_via_rename_aside(tmp_path):
         assert "md_file_path" not in cols
         v = conn.execute("SELECT version FROM db_version ORDER BY version DESC LIMIT 1").fetchone()[0]
         assert v == queue_db.DB_VERSION
+
+
+class TestConnectionReuse:
+    """ENH-004: per-thread cached connections opened in WAL journal mode."""
+
+    def test_get_connection_enables_wal_mode(self, db_path: Path) -> None:
+        queue_db._get_connection(db_path)
+        mode = queue_db._get_connection(db_path).execute("PRAGMA journal_mode").fetchone()[0]
+        assert mode == "wal"
+
+    def test_get_connection_caches_per_thread(self, db_path: Path) -> None:
+        first = queue_db._get_connection(db_path)
+        second = queue_db._get_connection(db_path)
+        assert first is second
+
+    def test_get_connection_is_thread_local(self, db_path: Path) -> None:
+        main_conn = queue_db._get_connection(db_path)
+        holder: dict[str, object] = {}
+
+        def worker() -> None:
+            holder["conn"] = queue_db._get_connection(db_path)
+            queue_db.close_connections()  # release this thread's connection
+
+        thread = threading.Thread(target=worker)
+        thread.start()
+        thread.join()
+        assert holder["conn"] is not main_conn
+
+    def test_concurrent_writers_do_not_lock(self, db_path: Path) -> None:
+        errors: list[str] = []
+
+        def worker(worker_id: int) -> None:
+            try:
+                for i in range(25):
+                    url = f"http://example-{worker_id}-{i}.com/page{i}"
+                    queue_db.add_to_queue("ticket", [url], db_path=db_path)
+                    queue_db.mark_complete(
+                        "ticket",
+                        url,
+                        raw_file_path=Path("/tmp/raw.md"),
+                        file_paths={},
+                        db_path=db_path,
+                    )
+            except Exception as exc:  # noqa: BLE001 - surface any failure type
+                errors.append(f"{type(exc).__name__}: {exc}")
+            finally:
+                queue_db.close_connections()
+
+        threads = [threading.Thread(target=worker, args=(worker_id,)) for worker_id in range(4)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert errors == []
+        stats = queue_db.get_queue_stats("ticket", db_path=db_path)
+        assert stats[PageStatus.COMPLETED.value] == 100

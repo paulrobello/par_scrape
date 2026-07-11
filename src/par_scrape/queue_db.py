@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+import threading
 import time
 from collections.abc import Iterable
 from contextlib import closing
@@ -26,6 +27,61 @@ DB_VERSION = 2
 # the error_msg column bounded on pathological failures. See ``mark_error``.
 ERROR_MESSAGE_MAX_LEN = 255
 
+# Per-thread cache of long-lived SQLite connections. SQLite connections are not
+# safe to share across threads, so the cache lives on a threading.local and is
+# keyed by resolved database path. See ``_get_connection``.
+_local = threading.local()
+
+
+def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
+    """Return a cached per-thread SQLite connection configured for WAL.
+
+    Replaces the former connection-per-statement pattern. Each connection is
+    opened once with ``busy_timeout=5000`` (wait rather than raise ``database
+    is locked``), ``synchronous=NORMAL``, and ``journal_mode=WAL`` so concurrent
+    readers/writers are safe — a prerequisite for the thread pool in ENH-001.
+    WAL is rejected on some network filesystems (e.g. NFS); in that case the
+    busy timeout still applies and the database keeps its default journal mode.
+
+    Args:
+        db_path: Database file to open. Defaults to :data:`DB_PATH` when ``None``
+            (resolved at call time so tests can patch ``DB_PATH``).
+
+    Returns:
+        A long-lived connection for ``(this thread, resolved path)``. Callers own
+        the transaction scope via ``with conn:``; the connection itself is reused
+        across calls and released by :func:`close_connections`.
+    """
+    path = Path(db_path) if db_path is not None else DB_PATH
+    cache: dict[str, sqlite3.Connection] = getattr(_local, "connections", None) or {}
+    _local.connections = cache
+    key = str(path.resolve())
+    conn = cache.get(key)
+    if conn is None:
+        conn = sqlite3.connect(path)
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        # WAL may be unsupported on network filesystems; fall back silently.
+        conn.execute("PRAGMA journal_mode=WAL")
+        cache[key] = conn
+    return conn
+
+
+def close_connections() -> None:
+    """Close this thread's cached SQLite connections.
+
+    Called from the runner's ``finally`` block on shutdown and from the test
+    fixture teardown so cached connections do not leak as ``ResourceWarning``
+    (this project has history there; see commit ``7a1e003``).
+    """
+    cache: dict[str, sqlite3.Connection] = getattr(_local, "connections", None) or {}
+    for conn in cache.values():
+        try:
+            conn.close()
+        except sqlite3.Error:
+            pass
+    cache.clear()
+
 
 def _rename_db_aside(found_version: int | None, db_path: Path) -> None:
     """
@@ -47,6 +103,13 @@ def _rename_db_aside(found_version: int | None, db_path: Path) -> None:
     while backup.exists():
         backup = db_path.with_name(f"{base_name}.{counter}")
         counter += 1
+    # Drop WAL sidecar files alongside the main database; under WAL mode the
+    # main file's -wal/-shm siblings are transient checkpoint artifacts and must
+    # not be left orphaned when the database is moved aside.
+    for suffix in ("-wal", "-shm"):
+        sidecar = db_path.with_name(db_path.name + suffix)
+        if sidecar.exists():
+            sidecar.unlink()
     db_path.rename(backup)
     console_out.print(
         f"[bold yellow]Incompatible crawl database moved to {backup}. "
@@ -90,6 +153,9 @@ def init_db(db_path: Path | None = None) -> None:
             rebuild = True
 
         if rebuild:
+            # Release any cached handles on this thread before moving the file
+            # aside — cached connections are long-lived (see ``_get_connection``).
+            close_connections()
             _rename_db_aside(found_version, db_path)
 
     with closing(sqlite3.connect(db_path)) as conn, conn:
@@ -174,7 +240,8 @@ def get_queue_stats(ticket_id: str, db_path: Path | None = None) -> dict[str, in
         dict: Dictionary with counts of items in each status
     """
     db_path = db_path if db_path is not None else DB_PATH
-    with closing(sqlite3.connect(db_path)) as conn, conn:
+    conn = _get_connection(db_path)
+    with conn:
         # One indexed scan with GROUP BY instead of four COUNT(*) queries; the
         # dict is pre-filled so callers always see every PageStatus (zero-count
         # statuses that have no rows still appear).
@@ -203,7 +270,8 @@ def add_to_queue(ticket_id: str, urls: Iterable[str], depth: int = 0, db_path: P
     """
     db_path = db_path if db_path is not None else DB_PATH
 
-    with closing(sqlite3.connect(db_path)) as conn, conn:
+    conn = _get_connection(db_path)
+    with conn:
         # Use BEGIN IMMEDIATE for better concurrency control
         conn.execute("BEGIN IMMEDIATE")
         try:
@@ -277,7 +345,8 @@ def get_next_urls(
     urls = []
     domains_used = set()
 
-    with closing(sqlite3.connect(db_path)) as conn, conn:
+    conn = _get_connection(db_path)
+    with conn:
         # Use BEGIN IMMEDIATE to acquire a write lock immediately and prevent race conditions
         conn.execute("BEGIN IMMEDIATE")
         try:
@@ -372,7 +441,8 @@ def set_crawl_delay(domain: str, delay_seconds: int, db_path: Path | None = None
         db_path: Database file to write to. Defaults to :data:`DB_PATH` when ``None``.
     """
     db_path = db_path if db_path is not None else DB_PATH
-    with closing(sqlite3.connect(db_path)) as conn, conn:
+    conn = _get_connection(db_path)
+    with conn:
         conn.execute(
             """
             INSERT OR REPLACE INTO domain_rate_limit (domain, last_access, crawl_delay)
@@ -395,7 +465,8 @@ def get_url_depth(ticket_id: str, url: str, db_path: Path | None = None) -> int:
         int: The row's ``depth`` value, or ``0`` when the URL is not queued
     """
     db_path = db_path if db_path is not None else DB_PATH
-    with closing(sqlite3.connect(db_path)) as conn, conn:
+    conn = _get_connection(db_path)
+    with conn:
         row = conn.execute(
             "SELECT depth FROM scrape WHERE ticket_id = ? AND url = ?",
             (ticket_id, url.rstrip("/")),
@@ -422,7 +493,8 @@ def increase_crawl_delay(domain: str, factor: int = 2, cap: int = 30, db_path: P
         int: The new crawl delay in effect for ``domain``
     """
     db_path = db_path if db_path is not None else DB_PATH
-    with closing(sqlite3.connect(db_path)) as conn, conn:
+    conn = _get_connection(db_path)
+    with conn:
         row = conn.execute("SELECT crawl_delay FROM domain_rate_limit WHERE domain = ?", (domain,)).fetchone()
         current_delay = row[0] if row else 1
     new_delay = min(current_delay * factor, cap)
@@ -451,7 +523,8 @@ def mark_complete(
         db_path: Database file to write to. Defaults to :data:`DB_PATH` when ``None``.
     """
     db_path = db_path if db_path is not None else DB_PATH
-    with closing(sqlite3.connect(db_path)) as conn, conn:
+    conn = _get_connection(db_path)
+    with conn:
         conn.execute(
             """
             UPDATE scrape
@@ -491,7 +564,8 @@ def mark_error(
         db_path: Database file to write to. Defaults to :data:`DB_PATH` when ``None``.
     """
     db_path = db_path if db_path is not None else DB_PATH
-    with closing(sqlite3.connect(db_path)) as conn, conn:
+    conn = _get_connection(db_path)
+    with conn:
         conn.execute(
             """
             UPDATE scrape
