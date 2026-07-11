@@ -80,7 +80,20 @@ The options `--crawl-max-pages` / `-M` can be used to limit the total number of 
 
 ### Crawl state
 
-Crawl state is persisted in an SQLite database at `~/.par_scrape/jobs.sqlite`, and every page is tagged with its run name (`--run-name` / `-n`). Provider and other configuration is read from `~/.par_scrape.env` (auto-migrated from the legacy `~/.par-scrape.env` on first run). When the database schema is upgraded in a new release, the older database is renamed aside to `jobs.sqlite.bak-v<version>` (for example `jobs.sqlite.bak-v1`) rather than deleted, so crawl history survives an upgrade. To reset a stuck run, delete the `jobs.sqlite` file or start fresh with a new `--run-name`.
+Crawl state is persisted in an SQLite database at `~/.par_scrape/jobs.sqlite`, and every page is tagged with its run name (`--run-name` / `-n`). Provider and other configuration is read from `~/.par_scrape.env` (auto-migrated from the legacy `~/.par-scrape.env` on first run). When the database schema is upgraded in a new release, the older database is renamed aside to `jobs.sqlite.bak-v<version>` (for example `jobs.sqlite.bak-v1`) rather than deleted, so crawl history survives an upgrade.
+
+#### Managing crawl state
+
+The `queue` command group inspects and repairs the resume queue from the CLI, so you no longer need to hand-edit `jobs.sqlite`:
+
+```bash
+par_scrape queue list                 # every run, with queued/active/completed/error counts
+par_scrape queue status <run>         # per-status counts + the errored pages for a run (--all to include completed/queued)
+par_scrape queue retry <run>          # reset every errored page in a run back to queued for the next resume
+par_scrape queue reset <run>          # delete every page row for a run (asks for confirmation; --yes / -y to skip)
+```
+
+`queue retry <run>` resets errored pages to `queued` (clearing the recorded error and retry count) so the next resume picks them up; it prints the resume command to run. `queue reset <run>` is destructive — it removes the queue rows for a run (on-disk output files are left untouched) and asks for confirmation unless you pass `--yes` / `-y`; back up `~/.par_scrape/jobs.sqlite` first if unsure. To start entirely fresh instead, use a new `--run-name`.
 
 ### Incremental crawls
 

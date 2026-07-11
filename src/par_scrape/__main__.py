@@ -13,14 +13,44 @@ from par_ai_core.output_utils import DisplayOutputFormat
 from par_ai_core.par_logging import console_out
 from par_ai_core.pricing_lookup import PricingDisplay
 from par_ai_core.web_tools import ScraperChoice, ScraperWaitType
+from typer.core import TyperGroup
 
 from par_scrape import __application_title__, __version__
 from par_scrape.crawl import CrawlType
 from par_scrape.enums import CleanupType, OutputFormat
+from par_scrape.queue_cli import queue_app
 from par_scrape.runner import ScrapeConfig, run_crawl
 
+
+class _DefaultScrapeGroup(TyperGroup):
+    """Reroute bare flags to the ``scrape`` command (backward compatibility).
+
+    Once the ``queue`` sub-app is registered, the app has more than one command
+    and Click no longer treats the lone command as the implicit default. To keep
+    ``par_scrape -u URL`` and every existing flag form working, prepend
+    ``scrape`` to the args unless the first token is itself a known subcommand or
+    the group-level ``--help``. ``--version``/``-v`` deliberately route to
+    ``scrape`` (the eager callback lives there).
+    """
+
+    _KNOWN_TOPLEVEL = frozenset({"scrape", "queue", "--help"})
+
+    def parse_args(self, ctx, args):
+        # Annotations deliberately omitted: Typer vendors its own ``click``
+        # (``typer._click``), so a top-level ``click.Context`` annotation would
+        # conflict with the parent signature under pyright even though the
+        # override is structurally valid.
+        if args and args[0] not in self._KNOWN_TOPLEVEL:
+            args = ["scrape", *args]
+        return super().parse_args(ctx, args)
+
+
 # Initialize Typer app
-app = typer.Typer(help="Web scraping tool with options for Selenium or Playwright")
+app = typer.Typer(
+    cls=_DefaultScrapeGroup,
+    help="Web scraping tool with options for Selenium or Playwright",
+)
+app.add_typer(queue_app, name="queue")
 
 
 def version_callback(value: bool) -> None:
@@ -54,8 +84,8 @@ def _startup() -> None:
     load_dotenv(dotenv_path=new_env_path)
 
 
-@app.command()
-def main(
+@app.command(name="scrape")
+def scrape(
     url: Annotated[str, typer.Option("--url", "-u", help="URL to scrape")],
     output_format: Annotated[
         list[OutputFormat] | None,
@@ -245,6 +275,10 @@ def main(
 ):
     """
     Scrape and optionally crawl / extract data from a website.
+
+    Invoked as ``par_scrape -u URL ...`` (the default command, no subcommand
+    word needed) or explicitly as ``par_scrape scrape -u URL ...``. Use
+    ``par_scrape queue ...`` to inspect and manage the resume queue.
 
     AI is only used if an output format other than md is specified.
 

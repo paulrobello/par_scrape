@@ -679,3 +679,66 @@ class TestContentHashColumn:
             ).fetchone()
         assert row is not None
         assert row[0] is None
+
+
+class TestQueueManagement:
+    """ENH-006: list_runs / get_run_pages / requeue_errors / delete_run."""
+
+    def test_list_runs_reports_per_status_counts(self, db_path):
+        crawl.add_to_queue("runA", ["https://example.com/a1", "https://example.com/a2"], db_path=db_path)
+        crawl.mark_error("runA", "https://example.com/a1", "boom", db_path=db_path)
+        crawl.add_to_queue("runB", ["https://example.com/b1"], db_path=db_path)
+        crawl.mark_complete(
+            "runB",
+            "https://example.com/b1",
+            raw_file_path=Path("/tmp/r.md"),
+            file_paths={},
+            db_path=db_path,
+        )
+
+        runs = dict(crawl.list_runs(db_path=db_path))
+        assert "runA" in runs and "runB" in runs
+        assert runs["runA"][crawl.PageStatus.ERROR.value] == 1
+        assert runs["runA"][crawl.PageStatus.QUEUED.value] == 1
+        assert runs["runB"][crawl.PageStatus.COMPLETED.value] == 1
+
+    def test_get_run_pages_returns_rows_by_name(self, db_path):
+        crawl.add_to_queue("runA", ["https://example.com/a1"], db_path=db_path)
+        crawl.mark_error("runA", "https://example.com/a1", "boom", error_type=crawl.ErrorType.NETWORK, db_path=db_path)
+
+        pages = crawl.get_run_pages("runA", db_path=db_path)
+        assert len(pages) == 1
+        row = pages[0]
+        assert row["url"] == "https://example.com/a1"
+        assert row["status"] == "error"
+        assert row["error_type"] == "network"
+
+    def test_requeue_errors_resets_status_and_returns_count(self, db_path):
+        crawl.add_to_queue("runA", ["https://example.com/a1", "https://example.com/a2"], db_path=db_path)
+        crawl.mark_error("runA", "https://example.com/a1", "boom", db_path=db_path)
+        crawl.mark_error("runA", "https://example.com/a2", "boom", db_path=db_path)
+
+        requeued = crawl.requeue_errors("runA", db_path=db_path)
+        assert requeued == 2
+        stats = crawl.get_queue_stats("runA", db_path=db_path)
+        assert stats[crawl.PageStatus.ERROR.value] == 0
+        assert stats[crawl.PageStatus.QUEUED.value] == 2
+
+    def test_requeue_errors_only_affects_target_run(self, db_path):
+        crawl.add_to_queue("runA", ["https://example.com/a1"], db_path=db_path)
+        crawl.add_to_queue("runB", ["https://example.com/b1"], db_path=db_path)
+        crawl.mark_error("runA", "https://example.com/a1", "boom", db_path=db_path)
+        crawl.mark_error("runB", "https://example.com/b1", "boom", db_path=db_path)
+
+        assert crawl.requeue_errors("runA", db_path=db_path) == 1
+        assert crawl.get_queue_stats("runB", db_path=db_path)[crawl.PageStatus.ERROR.value] == 1
+
+    def test_delete_run_removes_only_target(self, db_path):
+        crawl.add_to_queue("runA", ["https://example.com/a1"], db_path=db_path)
+        crawl.add_to_queue("runB", ["https://example.com/b1", "https://example.com/b2"], db_path=db_path)
+
+        removed = crawl.delete_run("runB", db_path=db_path)
+        assert removed == 2
+        runs = dict(crawl.list_runs(db_path=db_path))
+        assert "runA" in runs
+        assert "runB" not in runs

@@ -90,6 +90,10 @@ def _get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     conn = closer.conn if closer is not None else None
     if conn is None:
         conn = sqlite3.connect(path)
+        # Row supports both index access (row[0]) and key access (row["url"]),
+        # so existing index/unordered callers are unaffected while ENH-006
+        # helpers can read columns by name.
+        conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("PRAGMA synchronous=NORMAL")
         # WAL may be unsupported on network filesystems; fall back silently.
@@ -662,3 +666,90 @@ def find_completed_by_hash(
     if row is None:
         return None
     return {"raw_file_path": row[0], "file_paths": row[1]}
+
+
+def list_runs(db_path: Path | None = None) -> list[tuple[str, dict[str, int]]]:
+    """List every run in the queue with per-status page counts (ENH-006).
+
+    Args:
+        db_path: Database file to query. Defaults to :data:`DB_PATH` when ``None``.
+
+    Returns:
+        A list of ``(ticket_id, counts)`` pairs, one per run, where ``counts``
+        maps every :class:`PageStatus` value to its row count (zero-filled).
+    """
+    db_path = db_path if db_path is not None else DB_PATH
+    conn = _get_connection(db_path)
+    with conn:
+        rows = conn.execute("SELECT ticket_id, status, COUNT(*) FROM scrape GROUP BY ticket_id, status").fetchall()
+    runs: dict[str, dict[str, int]] = {}
+    for ticket_id, status, count in rows:
+        counts = runs.setdefault(ticket_id, {s.value: 0 for s in PageStatus})
+        counts[status] = count
+    return list(runs.items())
+
+
+def get_run_pages(ticket_id: str, db_path: Path | None = None) -> list[sqlite3.Row]:
+    """Return the per-page rows recorded for a run (ENH-006, shared with ENH-005).
+
+    Args:
+        ticket_id: Unique identifier for the crawl job.
+        db_path: Database file to query. Defaults to :data:`DB_PATH` when ``None``.
+
+    Returns:
+        The run's rows (``url``, ``status``, ``error_type``, ``error_msg``,
+        ``attempts``, ``file_paths``) ordered by URL.
+    """
+    db_path = db_path if db_path is not None else DB_PATH
+    conn = _get_connection(db_path)
+    with conn:
+        return conn.execute(
+            "SELECT url, status, error_type, error_msg, attempts, file_paths "
+            "FROM scrape WHERE ticket_id = ? ORDER BY url",
+            (ticket_id,),
+        ).fetchall()
+
+
+def requeue_errors(ticket_id: str, db_path: Path | None = None) -> int:
+    """Reset every errored page in a run back to queued for retry (ENH-006).
+
+    Clears the recorded error, resets ``attempts`` so the retry cap no longer
+    blocks the page, and sets ``status`` to ``queued`` so the next crawl picks
+    it up.
+
+    Args:
+        ticket_id: Unique identifier for the crawl job.
+        db_path: Database file to write to. Defaults to :data:`DB_PATH` when ``None``.
+
+    Returns:
+        The number of errored rows that were requeued.
+    """
+    db_path = db_path if db_path is not None else DB_PATH
+    conn = _get_connection(db_path)
+    with conn:
+        cursor = conn.execute(
+            "UPDATE scrape SET status = ?, error_msg = NULL, error_type = NULL, attempts = 0 "
+            "WHERE ticket_id = ? AND status = ?",
+            (PageStatus.QUEUED.value, ticket_id, PageStatus.ERROR.value),
+        )
+        return cursor.rowcount
+
+
+def delete_run(ticket_id: str, db_path: Path | None = None) -> int:
+    """Delete every page row for a run from the queue (ENH-006).
+
+    Destructive: only the queue rows are removed; on-disk output files are left
+    untouched.
+
+    Args:
+        ticket_id: Unique identifier for the crawl job.
+        db_path: Database file to write to. Defaults to :data:`DB_PATH` when ``None``.
+
+    Returns:
+        The number of rows deleted.
+    """
+    db_path = db_path if db_path is not None else DB_PATH
+    conn = _get_connection(db_path)
+    with conn:
+        cursor = conn.execute("DELETE FROM scrape WHERE ticket_id = ?", (ticket_id,))
+        return cursor.rowcount
