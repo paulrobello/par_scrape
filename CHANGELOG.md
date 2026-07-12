@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.11.0] - 2026-07-11
+
 ### Added
 - Public library API: `from par_scrape import scrape` exposes a typed, documented programmatic entry point (`scrape(url, ...) -> ScrapeResult`) so the package is usable from pipelines, notebooks, and other agents without shelling out to the CLI. Returns a `ScrapeResult` with one `PageResult` per page (url, status, error message, output file paths) and an `ok` property. Markdown-only by default (no LLM, no API key); pass `ai_provider` with an LLM output format for structured extraction. Configuration problems raise `ProviderConfigError` / `CrawlConfigError`; per-page failures surface as `PageResult` entries with `status == "error"` rather than raising. Provider API keys are read from the environment (the library does not load `~/.par_scrape.env`). The API is **provisional** for one release. Also adds a shared `runner.build_config(...)` so the CLI and the API cannot drift, and `--silent`/`quiet=True` now suppress the configuration panels too (ENH-005).
 - Queue management CLI: a `par_scrape queue` command group makes the resume queue inspectable and repairable from the command line — `queue list` (every run with per-status counts), `queue status <run>` (per-status counts plus the errored pages; `--all` includes completed/queued), `queue retry <run>` (reset a run's errored pages back to queued for the next resume), and `queue reset <run>` (delete a run's queue rows, with a confirmation prompt and `--yes`/`-y` to skip). Removes the need to hand-edit `~/.par_scrape/jobs.sqlite` (ENH-006). Bare invocation `par_scrape -u URL ...` keeps working unchanged via a default-command group that reroutes bare flags to `scrape`; the explicit form `par_scrape scrape -u URL ...` is also accepted.

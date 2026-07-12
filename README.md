@@ -359,6 +359,14 @@ Notes: configuration problems (unknown provider, an LLM format requested without
 
 ## What's New
 
+- Version 0.11.0
+  - New `par_scrape queue` command group (`list`, `status`, `retry`, `reset`) to inspect and repair the resume queue without hand-editing `~/.par_scrape/jobs.sqlite` (ENH-006). Bare `par_scrape -u URL ...` still works; `par_scrape scrape -u URL ...` is also accepted.
+  - New `--prune` flag strips nav/footer boilerplate before LLM extraction, cutting input tokens ~30–60% with no loss of extracted fields (ENH-003).
+  - New library API: `from par_scrape import scrape` for pipelines, notebooks, and other agents (provisional) (ENH-005).
+  - Concurrent LLM extraction: `--scrape-max-parallel` / `-P` greater than 1 overlaps per-page LLM latency across a batch (ENH-001).
+  - `--if-changed` skips LLM extraction on pages unchanged since a previous run, so repeat crawls of static sites are near-free (ENH-002).
+  - Per-thread SQLite WAL connections make queue writes concurrency-safe and eliminate `database is locked` under parallel extraction (ENH-004).
+  - See [CHANGELOG.md](CHANGELOG.md) for the full list
 - Version 0.10.0
   - **⚠️ Breaking:** `--url` / `-u` is now **required**. A bare `par_scrape` invocation no longer defaults to a third-party URL; pass `--url` explicitly. (Existing scripts and examples already pass `--url`/`-u` and are unaffected.)
   - **⚠️ Breaking:** An implicit `.env` file in the current working directory is no longer auto-loaded (an untrusted directory could otherwise redirect API traffic and exfiltrate provider keys). Use the new opt-in `--env-file PATH` option to load a project-local env file; `~/.par_scrape.env` and the `~/.par-scrape.env` migration are unchanged.
